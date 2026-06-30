@@ -166,7 +166,7 @@ class GeminiClient(
                 put("responseModalities", JSONArray().apply { put("AUDIO") })
                 put("translationConfig", JSONObject().apply {
                     put("targetLanguageCode", targetLang)
-                    put("echoTargetLanguage", echo)
+                    put("echoTargetLanguage", true)
                 })
             })
             put("inputAudioTranscription", JSONObject())

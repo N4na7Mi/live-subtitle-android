@@ -111,13 +111,20 @@ class CaptionOverlayView(
 
     fun setOutput(text: String?) {
         val t = text ?: ""
-        if (outDraft.isNotEmpty() && t.startsWith(outDraft)) {
-            outDraft = t
-        } else {
-            if (outDraft.isNotEmpty()) {
-                outCommitted = (outCommitted + "\n" + outDraft).trimStart('\n')
-                if (outCommitted.length > 1500) outCommitted = outCommitted.takeLast(1500)
+        if (outDraft.isNotEmpty()) {
+            when {
+                t.startsWith(outDraft) -> outDraft = t
+                outDraft.startsWith(t) -> {
+                    refreshOutput()
+                    return
+                }
+                else -> {
+                    outCommitted = (outCommitted + "\n" + outDraft).trimStart('\n')
+                    if (outCommitted.length > 1500) outCommitted = outCommitted.takeLast(1500)
+                    outDraft = t
+                }
             }
+        } else {
             outDraft = t
         }
         refreshOutput()
@@ -125,13 +132,20 @@ class CaptionOverlayView(
 
     fun setInput(text: String?) {
         val t = text ?: ""
-        if (inDraft.isNotEmpty() && t.startsWith(inDraft)) {
-            inDraft = t
-        } else {
-            if (inDraft.isNotEmpty()) {
-                inCommitted = (inCommitted + "\n" + inDraft).trimStart('\n')
-                if (inCommitted.length > 800) inCommitted = inCommitted.takeLast(800)
+        if (inDraft.isNotEmpty()) {
+            when {
+                t.startsWith(inDraft) -> inDraft = t
+                inDraft.startsWith(t) -> {
+                    refreshInput()
+                    return
+                }
+                else -> {
+                    inCommitted = (inCommitted + "\n" + inDraft).trimStart('\n')
+                    if (inCommitted.length > 800) inCommitted = inCommitted.takeLast(800)
+                    inDraft = t
+                }
             }
+        } else {
             inDraft = t
         }
         refreshInput()

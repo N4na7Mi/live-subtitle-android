@@ -117,7 +117,7 @@ class AudioCapture(
 
     private fun micLoop(ar: AudioRecord, bufSize: Int) {
         // 16 kHz mono PCM16: each frame is 2 bytes. We read in chunks of
-        // ~CHUNK_SIZE bytes (100 ms) and forward directly — no resampling
+        // ~CHUNK_SIZE bytes (250 ms) and forward directly — no resampling
         // needed because we requested the target rate.
         val buf = ByteArray(bufSize)
         while (running) {
@@ -170,6 +170,6 @@ class AudioCapture(
     companion object {
         private const val TAG = "AudioCapture"
         const val GEMINI_INPUT_RATE = 16000
-        const val CHUNK_SIZE = 3200  // bytes per Gemini send (~100 ms @16kHz mono int16)
+        const val CHUNK_SIZE = 8000  // bytes per Gemini send (~250 ms @16kHz mono int16)
     }
 }
