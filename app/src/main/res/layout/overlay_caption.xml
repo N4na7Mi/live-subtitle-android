@@ -1,9 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Floating caption overlay.
-    Root is a transparent container; the inner `overlayRoot` card is the visible
-    "HUD". Drag handle / status row + output / input captions + control buttons.
--->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
@@ -20,7 +15,6 @@
         android:paddingHorizontal="16dp"
         android:paddingVertical="12dp">
 
-        <!-- Header: status dot + status text + lang badge + drag hint -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -50,13 +44,12 @@
                 android:background="@drawable/lang_badge_bg"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="2dp"
-                android:text="→"
+                android:text="@string/lang_badge_prefix"
                 android:textColor="#FFFFFF"
                 android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Translated output (primary) -->
         <TextView
             android:id="@+id/overlayOutput"
             android:layout_width="match_parent"
@@ -64,12 +57,11 @@
             android:layout_marginTop="8dp"
             android:fontFamily="sans-serif-medium"
             android:maxLines="5"
-            android:text="—"
+            android:text="@string/caption_placeholder"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
 
-        <!-- Divider -->
         <View
             android:id="@+id/overlayDivider"
             android:layout_width="match_parent"
@@ -77,7 +69,6 @@
             android:layout_marginVertical="6dp"
             android:background="#1AFFFFFF" />
 
-        <!-- Original input (secondary) -->
         <TextView
             android:id="@+id/overlayInput"
             android:layout_width="match_parent"
@@ -88,7 +79,6 @@
             android:textSize="12sp"
             android:textStyle="italic" />
 
-        <!-- Control bar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -101,9 +91,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
                 android:background="@drawable/overlay_btn_primary"
-                android:minWidth="76dp"
+                android:minWidth="64dp"
                 android:paddingHorizontal="12dp"
-                android:text="@string/start"
+                android:text="@string/pause"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp" />
 
@@ -115,7 +105,19 @@
                 android:background="@drawable/overlay_btn_secondary"
                 android:minWidth="64dp"
                 android:paddingHorizontal="12dp"
-                android:text="Clear"
+                android:text="@string/clear"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/overlayCloseBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/overlay_btn_secondary"
+                android:minWidth="64dp"
+                android:paddingHorizontal="12dp"
+                android:text="@string/close"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp" />
 

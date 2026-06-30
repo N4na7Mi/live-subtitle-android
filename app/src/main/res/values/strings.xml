@@ -1,50 +1,68 @@
 <resources>
-    <string name="app_name">LiveBuddy</string>
-    <string name="settings_title">Settings</string>
+    <string name="app_name">实时字幕</string>
+    <string name="settings_title">设置</string>
 
-    <!-- Notification -->
     <string name="notif_channel_id">live_translate</string>
-    <string name="notif_channel_name">Live Translate</string>
-    <string name="notif_title">Gemini Live Translate</string>
-    <string name="notif_text_running">Translating… tap to open</string>
-    <string name="notif_text_paused">Paused</string>
+    <string name="notif_channel_name">实时翻译</string>
+    <string name="notif_title">Gemini 实时字幕</string>
+    <string name="notif_text_running">正在翻译，点按打开</string>
+    <string name="notif_text_paused">已暂停</string>
 
-    <!-- Main -->
-    <string name="start">Start</string>
-    <string name="stop">Stop</string>
-    <string name="open_settings">Settings</string>
-    <string name="status_idle">Idle</string>
-    <string name="status_connecting">Connecting…</string>
-    <string name="status_connected">Connected</string>
-    <string name="status_stopped">Stopped</string>
+    <string name="start">开始</string>
+    <string name="pause">暂停</string>
+    <string name="stop">停止</string>
+    <string name="close">关闭</string>
+    <string name="clear">清空</string>
+    <string name="open_settings">设置</string>
+    <string name="status_idle">待机</string>
+    <string name="status_connecting">正在连接</string>
+    <string name="status_connected">已连接</string>
+    <string name="status_stopped">已停止</string>
+    <string name="status_disconnected">连接已断开</string>
+    <string name="caption_placeholder">等待字幕...</string>
+    <string name="lang_badge_prefix">翻译到</string>
 
-    <!-- Settings -->
-    <string name="section_connection">CONNECTION</string>
-    <string name="section_audio">AUDIO</string>
-    <string name="section_appearance">APPEARANCE</string>
-    <string name="section_advanced">ADVANCED</string>
-    <string name="api_key_hint">Paste your Google Gemini API key</string>
-    <string name="api_base_hint">API Base URL (default: Google official)</string>
-    <string name="audio_source">Audio source</string>
-    <string name="audio_source_mic">Microphone</string>
-    <string name="audio_source_system">System audio (loopback)</string>
-    <string name="translate_to">Translate to</string>
-    <string name="playback_volume">Playback volume</string>
-    <string name="echo_target">Echo target-language audio</string>
-    <string name="font_size">Caption font size</string>
-    <string name="bg_opacity">Background opacity</string>
-    <string name="show_original">Show original (source) transcript</string>
-    <string name="system_prompt">System prompt</string>
-    <string name="save">Save</string>
-    <string name="cancel">Cancel</string>
+    <string name="main_subtitle">基于 Gemini Live 的实时语音翻译</string>
+    <string name="main_hint_idle">运行后会显示悬浮字幕窗。</string>
+    <string name="main_hint_running">悬浮字幕窗已启动，可切到其他应用使用。</string>
 
-    <!-- Permissions -->
-    <string name="perm_overlay_rationale">Floating caption needs the "Display over other apps" permission.</string>
-    <string name="perm_mic_rationale">Microphone access is required to translate speech.</string>
-    <string name="perm_notif_rationale">Notifications are required to keep the translation service running in the foreground.</string>
-    <string name="perm_system_audio_rationale">Capturing system audio requires screen recording permission. No video is captured, only audio.</string>
+    <string name="section_connection">连接</string>
+    <string name="section_audio">音频</string>
+    <string name="section_appearance">外观</string>
+    <string name="section_advanced">高级</string>
+    <string name="api_key_label">Gemini API Key</string>
+    <string name="api_key_hint">粘贴 Google Gemini API Key</string>
+    <string name="api_base_label">API Base URL</string>
+    <string name="api_base_hint">API Base URL，默认使用 Google 官方地址</string>
+    <string name="show_key">显示</string>
+    <string name="hide_key">隐藏</string>
+    <string name="proxy_enabled">启用代理</string>
+    <string name="proxy_type">代理类型</string>
+    <string name="proxy_host">代理地址</string>
+    <string name="proxy_host_hint">例如 127.0.0.1</string>
+    <string name="proxy_port">代理端口</string>
+    <string name="proxy_port_hint">例如 7890 或 10808</string>
+    <string name="proxy_note">hy2 需要先由代理客户端转换成本机 HTTP/SOCKS 端口；如果使用 VPN 模式，一般不用在这里配置。</string>
+    <string name="audio_source">音频来源</string>
+    <string name="audio_source_mic">麦克风</string>
+    <string name="audio_source_system">系统声音</string>
+    <string name="translate_to">翻译目标语言</string>
+    <string name="playback_volume">译文语音音量</string>
+    <string name="echo_target">播放译文语音</string>
+    <string name="font_size">字幕字号</string>
+    <string name="bg_opacity">背景透明度</string>
+    <string name="show_original">显示原文转写</string>
+    <string name="system_prompt">系统提示词</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
 
-    <!-- Errors -->
-    <string name="err_no_api_key">Please set your Google Gemini API key in Settings.</string>
-    <string name="err_no_overlay_perm">Floating window permission denied.</string>
+    <string name="perm_overlay_rationale">悬浮字幕需要“显示在其他应用上层”权限。</string>
+    <string name="perm_mic_rationale">需要麦克风权限才能翻译语音。</string>
+    <string name="perm_notif_rationale">需要通知权限来保持翻译服务运行。</string>
+    <string name="perm_system_audio_rationale">采集系统声音需要屏幕录制授权；不会录制视频，只使用音频。</string>
+
+    <string name="err_no_api_key">请先在设置中填写 Gemini API Key。</string>
+    <string name="err_no_overlay_perm">未获得悬浮窗权限。</string>
+    <string name="err_capture">音频采集失败：%1$s</string>
+    <string name="err_gemini">Gemini 错误：%1$s</string>
 </resources>

@@ -83,7 +83,7 @@ class AudioPlayer(
         }
     }
 
-    fun setVolume(v: Float) {
+    fun updateVolume(v: Float) {
         volume = v.coerceIn(0f, 1f)
         track?.setVolume(volume)
     }

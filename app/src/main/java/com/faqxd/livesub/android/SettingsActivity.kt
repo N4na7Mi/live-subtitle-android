@@ -25,6 +25,10 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var apiKeyEdit: EditText
     private lateinit var showKeyBtn: Button
     private lateinit var apiBaseEdit: EditText
+    private lateinit var proxyEnabledCheck: CheckBox
+    private lateinit var proxyTypeSpinner: Spinner
+    private lateinit var proxyHostEdit: EditText
+    private lateinit var proxyPortEdit: EditText
     private lateinit var langSpinner: Spinner
     private lateinit var sourceSpinner: Spinner
     private lateinit var volumeSlider: SeekBar
@@ -50,6 +54,10 @@ class SettingsActivity : AppCompatActivity() {
         apiKeyEdit = findViewById(R.id.apiKeyEdit)
         showKeyBtn = findViewById(R.id.showKeyBtn)
         apiBaseEdit = findViewById(R.id.apiBaseEdit)
+        proxyEnabledCheck = findViewById(R.id.proxyEnabledCheck)
+        proxyTypeSpinner = findViewById(R.id.proxyTypeSpinner)
+        proxyHostEdit = findViewById(R.id.proxyHostEdit)
+        proxyPortEdit = findViewById(R.id.proxyPortEdit)
         langSpinner = findViewById(R.id.langSpinner)
         sourceSpinner = findViewById(R.id.sourceSpinner)
         volumeSlider = findViewById(R.id.volumeSlider)
@@ -66,10 +74,10 @@ class SettingsActivity : AppCompatActivity() {
                 InputType.TYPE_TEXT_VARIATION_PASSWORD
             if (showing) {
                 apiKeyEdit.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-                showKeyBtn.text = "Show"
+                showKeyBtn.text = getString(R.string.show_key)
             } else {
                 apiKeyEdit.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-                showKeyBtn.text = "Hide"
+                showKeyBtn.text = getString(R.string.hide_key)
             }
         }
 
@@ -86,6 +94,15 @@ class SettingsActivity : AppCompatActivity() {
         apiKeyEdit.setText(settings.apiKey)
         apiBaseEdit.setText(settings.apiBase)
         if (apiBaseEdit.text.isBlank()) apiBaseEdit.hint = AppSettings.DEFAULT_API_BASE
+        proxyEnabledCheck.isChecked = settings.proxyEnabled
+        proxyHostEdit.setText(settings.proxyHost)
+        proxyPortEdit.setText(settings.proxyPort.takeIf { it > 0 }?.toString().orEmpty())
+
+        proxyTypeSpinner.adapter = ArrayAdapter(
+            this, android.R.layout.simple_spinner_dropdown_item,
+            listOf("HTTP", "SOCKS")
+        )
+        proxyTypeSpinner.setSelection(if (settings.proxyType.equals("SOCKS", ignoreCase = true)) 1 else 0)
 
         langSpinner.adapter = ArrayAdapter(
             this, android.R.layout.simple_spinner_dropdown_item,
@@ -111,6 +128,10 @@ class SettingsActivity : AppCompatActivity() {
     private fun applyFromUi() {
         settings.apiKey = apiKeyEdit.text.toString().trim()
         settings.apiBase = apiBaseEdit.text.toString().trim().ifBlank { AppSettings.DEFAULT_API_BASE }
+        settings.proxyEnabled = proxyEnabledCheck.isChecked
+        settings.proxyType = if (proxyTypeSpinner.selectedItemPosition == 1) "SOCKS" else "HTTP"
+        settings.proxyHost = proxyHostEdit.text.toString().trim()
+        settings.proxyPort = proxyPortEdit.text.toString().trim().toIntOrNull()?.coerceIn(1, 65535) ?: 7890
         val langIdx = langSpinner.selectedItemPosition
         if (langIdx in Languages.ALL.indices) {
             settings.targetLanguage = Languages.ALL[langIdx].code

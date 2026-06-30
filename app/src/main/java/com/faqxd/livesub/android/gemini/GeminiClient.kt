@@ -10,6 +10,8 @@ import okhttp3.WebSocketListener
 import okio.ByteString
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
 /**
@@ -34,11 +36,6 @@ class GeminiClient(
         fun onDisconnected(reason: String)
     }
 
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .pingInterval(15, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.SECONDS)   // streaming
-        .build()
-
     @Volatile private var ws: WebSocket? = null
     @Volatile private var running = false
 
@@ -47,6 +44,11 @@ class GeminiClient(
     private var targetLang: String = "es"
     private var systemPrompt: String = ""
     private var echo: Boolean = true
+    private var proxyEnabled: Boolean = false
+    private var proxyType: String = "HTTP"
+    private var proxyHost: String = ""
+    private var proxyPort: Int = 7890
+    private var client: OkHttpClient = buildClient()
 
     fun configure(
         apiKey: String,
@@ -54,12 +56,21 @@ class GeminiClient(
         systemPrompt: String,
         echoTargetLanguage: Boolean,
         apiBase: String = DEFAULT_API_BASE,
+        proxyEnabled: Boolean = false,
+        proxyType: String = "HTTP",
+        proxyHost: String = "",
+        proxyPort: Int = 7890,
     ) {
         this.apiKey = apiKey.trim()
         this.apiBase = apiBase.ifBlank { DEFAULT_API_BASE }.trim()
         this.targetLang = targetLang
         this.systemPrompt = systemPrompt
         this.echo = echoTargetLanguage
+        this.proxyEnabled = proxyEnabled
+        this.proxyType = proxyType
+        this.proxyHost = proxyHost.trim()
+        this.proxyPort = proxyPort
+        this.client = buildClient()
     }
 
     /** Start a new session. No-op if already running. */
@@ -132,6 +143,23 @@ class GeminiClient(
 
     // ---------- internals ----------
 
+    private fun buildClient(): OkHttpClient {
+        val builder = OkHttpClient.Builder()
+            .pingInterval(15, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.SECONDS)
+
+        if (proxyEnabled && proxyHost.isNotBlank() && proxyPort in 1..65535) {
+            val type = if (proxyType.equals("SOCKS", ignoreCase = true)) {
+                Proxy.Type.SOCKS
+            } else {
+                Proxy.Type.HTTP
+            }
+            builder.proxy(Proxy(type, InetSocketAddress(proxyHost, proxyPort)))
+        }
+
+        return builder.build()
+    }
+
     private fun buildWsUrl(): String {
         var base = apiBase.ifBlank { DEFAULT_API_BASE }.trimEnd('/')
         base = when {
@@ -181,6 +209,10 @@ class GeminiClient(
         root.optJSONObject("error")?.let { err ->
             val msg = err.optString("message", "Unknown")
             listener.onStatus("Gemini error: $msg")
+            listener.onDisconnected(msg)
+            running = false
+            ws?.close(1000, "server error")
+            ws = null
             return
         }
 

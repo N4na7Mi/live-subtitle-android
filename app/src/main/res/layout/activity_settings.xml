@@ -23,22 +23,22 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="Real-time speech translation powered by Gemini Live"
+            android:text="@string/main_subtitle"
             android:textColor="@color/text_secondary_light"
             android:textSize="11sp" />
 
-        <!-- CONNECTION -->
         <TextView
             style="@style/SectionTitle"
             android:text="@string/section_connection" />
 
-        <LinearLayout style="@style/SettingsCard"
+        <LinearLayout
+            style="@style/SettingsCard"
             android:orientation="vertical">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Gemini API Key"
+                android:text="@string/api_key_label"
                 android:textColor="@color/text_primary_light"
                 android:textSize="13sp" />
 
@@ -68,7 +68,7 @@
                     android:background="@drawable/edit_text_bg"
                     android:minWidth="0dp"
                     android:paddingHorizontal="14dp"
-                    android:text="Show"
+                    android:text="@string/show_key"
                     android:textColor="@color/text_primary_light"
                     android:textSize="12sp" />
             </LinearLayout>
@@ -77,7 +77,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="API Base URL"
+                android:text="@string/api_base_label"
                 android:textColor="@color/text_primary_light"
                 android:textSize="13sp" />
 
@@ -91,6 +91,77 @@
                 android:inputType="textUri"
                 android:paddingHorizontal="10dp"
                 android:textSize="13sp" />
+
+            <CheckBox
+                android:id="@+id/proxyEnabledCheck"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/proxy_enabled"
+                android:textColor="@color/text_primary_light"
+                android:textSize="13sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/proxy_type"
+                android:textColor="@color/text_primary_light"
+                android:textSize="13sp" />
+
+            <Spinner
+                android:id="@+id/proxyTypeSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/edit_text_bg"
+                android:paddingHorizontal="10dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/proxy_host"
+                android:textColor="@color/text_primary_light"
+                android:textSize="13sp" />
+
+            <EditText
+                android:id="@+id/proxyHostEdit"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/edit_text_bg"
+                android:hint="@string/proxy_host_hint"
+                android:inputType="textUri"
+                android:paddingHorizontal="10dp"
+                android:textSize="13sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/proxy_port"
+                android:textColor="@color/text_primary_light"
+                android:textSize="13sp" />
+
+            <EditText
+                android:id="@+id/proxyPortEdit"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/edit_text_bg"
+                android:hint="@string/proxy_port_hint"
+                android:inputType="number"
+                android:paddingHorizontal="10dp"
+                android:textSize="13sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/proxy_note"
+                android:textColor="@color/text_secondary_light"
+                android:textSize="11sp" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -109,12 +180,12 @@
                 android:paddingHorizontal="10dp" />
         </LinearLayout>
 
-        <!-- AUDIO -->
         <TextView
             style="@style/SectionTitle"
             android:text="@string/section_audio" />
 
-        <LinearLayout style="@style/SettingsCard"
+        <LinearLayout
+            style="@style/SettingsCard"
             android:orientation="vertical">
 
             <TextView
@@ -157,12 +228,12 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
-        <!-- APPEARANCE -->
         <TextView
             style="@style/SectionTitle"
             android:text="@string/section_appearance" />
 
-        <LinearLayout style="@style/SettingsCard"
+        <LinearLayout
+            style="@style/SettingsCard"
             android:orientation="vertical">
 
             <TextView
@@ -206,12 +277,12 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
-        <!-- ADVANCED -->
         <TextView
             style="@style/SectionTitle"
             android:text="@string/section_advanced" />
 
-        <LinearLayout style="@style/SettingsCard"
+        <LinearLayout
+            style="@style/SettingsCard"
             android:orientation="vertical">
 
             <TextView

@@ -16,18 +16,6 @@ import com.faqxd.livesub.android.data.AppSettings
 import com.faqxd.livesub.android.data.Languages
 import kotlin.math.abs
 
-/**
- * Port of `hud_window.py:HUDWindow`.
- *
- * Manages a floating overlay window added via [WindowManager] with
- * [WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY]. The window:
- *  - Is always-on-top, frameless, semi-transparent.
- *  - Can be dragged by touching anywhere on the card.
- *  - Shows: status dot + text, target-language badge, translated output
- *    (primary), original input (secondary), control bar (Pause / Clear / ⚙).
- *
- * All public methods must be called on the main thread.
- */
 class CaptionOverlayView(
     private val context: Context,
     private val settings: AppSettings,
@@ -37,21 +25,19 @@ class CaptionOverlayView(
     interface Callbacks {
         fun onToggleClicked()
         fun onClearClicked()
+        fun onCloseClicked()
         fun onSettingsClicked()
     }
 
-    // ---- Caption text state (mirrors HUDWindow._out_committed / _out_draft) ----
     private var outCommitted = ""
     private var outDraft = ""
     private var inCommitted = ""
     private var inDraft = ""
     private var statusText = ""
     private var statusKind: StatusKind = StatusKind.IDLE
-    private var isRunning = false
 
     private enum class StatusKind { IDLE, CONNECTING, CONNECTED, ERROR }
 
-    // ---- View references ----
     private lateinit var rootView: View
     private lateinit var statusDot: View
     private lateinit var statusTextView: TextView
@@ -61,6 +47,7 @@ class CaptionOverlayView(
     private lateinit var inputView: TextView
     private lateinit var toggleBtn: Button
     private lateinit var clearBtn: Button
+    private lateinit var closeBtn: Button
     private lateinit var settingsBtn: ImageButton
 
     private val windowManager: WindowManager =
@@ -68,12 +55,10 @@ class CaptionOverlayView(
 
     private var layoutParams: WindowManager.LayoutParams = buildLayoutParams()
     private var attached = false
-
     private var initialized = false
 
     val isAttached: Boolean get() = attached
 
-    /** Inflate the layout (does not attach to WindowManager yet). */
     fun init() {
         if (initialized) return
         rootView = View.inflate(context, R.layout.overlay_caption, null)
@@ -85,18 +70,19 @@ class CaptionOverlayView(
         inputView = rootView.findViewById(R.id.overlayInput)
         toggleBtn = rootView.findViewById(R.id.overlayToggleBtn)
         clearBtn = rootView.findViewById(R.id.overlayClearBtn)
+        closeBtn = rootView.findViewById(R.id.overlayCloseBtn)
         settingsBtn = rootView.findViewById(R.id.overlaySettingsBtn)
 
         toggleBtn.setOnClickListener { callbacks.onToggleClicked() }
         clearBtn.setOnClickListener { callbacks.onClearClicked() }
+        closeBtn.setOnClickListener { callbacks.onCloseClicked() }
         settingsBtn.setOnClickListener { callbacks.onSettingsClicked() }
 
         installDragHandler()
-        applyStyle()
         initialized = true
+        applyStyle()
     }
 
-    /** Add the overlay to the screen. Requires SYSTEM_ALERT_WINDOW permission. */
     fun attach() {
         if (!initialized) init()
         if (attached) return
@@ -104,7 +90,6 @@ class CaptionOverlayView(
             windowManager.addView(rootView, layoutParams)
             attached = true
         } catch (e: Exception) {
-            // Most likely: SYSTEM_ALERT_WINDOW permission not granted.
             throw RuntimeException("Failed to add overlay window: ${e.message}", e)
         }
     }
@@ -113,11 +98,10 @@ class CaptionOverlayView(
         if (!attached) return
         try {
             windowManager.removeView(rootView)
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         attached = false
     }
-
-    // ---------- public API (mirrors HUDWindow) ----------
 
     fun setOutput(text: String?) {
         val t = text ?: ""
@@ -151,9 +135,9 @@ class CaptionOverlayView(
         statusText = status ?: ""
         val s = statusText.lowercase()
         statusKind = when {
-            listOf("connected", "ready", "live").any { it in s } -> StatusKind.CONNECTED
-            listOf("connect", "starting", "loading", "init").any { it in s } -> StatusKind.CONNECTING
-            listOf("error", "fail", "disconnected", "stop").any { it in s } -> StatusKind.ERROR
+            listOf("connected", "已连接", "ready", "live").any { it in s } -> StatusKind.CONNECTED
+            listOf("connect", "正在连接", "starting", "loading", "init").any { it in s } -> StatusKind.CONNECTING
+            listOf("error", "fail", "disconnected", "stop", "错误", "失败", "断开", "停止").any { it in s } -> StatusKind.ERROR
             else -> StatusKind.IDLE
         }
         refreshStatus()
@@ -169,36 +153,27 @@ class CaptionOverlayView(
     }
 
     fun setRunningState(running: Boolean) {
-        isRunning = running
-        toggleBtn.text = if (running) "Pause" else "Start"
+        toggleBtn.text = if (running) context.getString(R.string.pause) else context.getString(R.string.start)
     }
 
-    /** Re-apply fontSize / opacity / showOriginal without re-inflating. */
     fun applyStyle() {
-        // Output font
+        if (!initialized) return
         outputView.setTextSize(TypedValue.COMPLEX_UNIT_SP, settings.fontSize.toFloat())
-        // Input font (60% of output)
-        inputView.setTextSize(TypedValue.COMPLEX_UNIT_SP, (settings.fontSize * 0.6f))
-        // Language badge
-        langBadge.text = "→ ${Languages.nameFor(settings.targetLanguage)}"
-        // Original visibility
+        inputView.setTextSize(TypedValue.COMPLEX_UNIT_SP, settings.fontSize * 0.6f)
+        langBadge.text = "${context.getString(R.string.lang_badge_prefix)} ${Languages.nameFor(settings.targetLanguage)}"
         val showOrig = settings.showOriginal
         divider.visibility = if (showOrig) View.VISIBLE else View.GONE
         inputView.visibility = if (showOrig) View.VISIBLE else View.GONE
-        // Card opacity: alpha is applied to the whole root view.
-        val alpha = (0.4f + 0.6f * settings.bgOpacity.coerceIn(0f, 1f))
-        rootView.alpha = alpha
+        rootView.alpha = 0.4f + 0.6f * settings.bgOpacity.coerceIn(0f, 1f)
         refreshStatus()
     }
-
-    // ---------- internals ----------
 
     private fun refreshOutput() {
         var text = outCommitted
         if (outDraft.isNotEmpty()) {
             text = (text + "\n" + outDraft).trim('\n')
         }
-        if (text.isEmpty()) text = "—"
+        if (text.isEmpty()) text = context.getString(R.string.caption_placeholder)
         if (outputView.text.toString() != text) {
             outputView.text = text
         }
@@ -216,7 +191,7 @@ class CaptionOverlayView(
 
     private fun refreshStatus() {
         if (statusTextView.text.toString() != statusText) {
-            statusTextView.text = statusText
+            statusTextView.text = statusText.ifBlank { context.getString(R.string.status_idle) }
         }
         val colorRes = when (statusKind) {
             StatusKind.IDLE -> R.color.status_idle
@@ -224,9 +199,7 @@ class CaptionOverlayView(
             StatusKind.CONNECTED -> R.color.status_connected
             StatusKind.ERROR -> R.color.status_error
         }
-        val color = context.getColor(colorRes)
-        // Status dot is a View with a drawable background; tint it.
-        statusDot.background?.setTint(color)
+        statusDot.background?.setTint(context.getColor(colorRes))
     }
 
     private fun buildLayoutParams(): WindowManager.LayoutParams {
@@ -251,11 +224,6 @@ class CaptionOverlayView(
         }
     }
 
-    /**
-     * Drag the overlay via touch on the card. Single-finger drag moves the
-     * window; taps on buttons still work because their onClick handlers run
-     * before our onTouch returns true for ACTION_MOVE.
-     */
     private fun installDragHandler() {
         var initialX = 0
         var initialY = 0
@@ -284,7 +252,8 @@ class CaptionOverlayView(
                         layoutParams.y = initialY + dy.toInt()
                         try {
                             windowManager.updateViewLayout(rootView, layoutParams)
-                        } catch (_: Exception) {}
+                        } catch (_: Exception) {
+                        }
                         true
                     } else {
                         false

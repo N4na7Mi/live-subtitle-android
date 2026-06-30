@@ -27,6 +27,10 @@ import androidx.core.content.edit
 data class AppSettings(
     var apiKey: String = "",
     var apiBase: String = DEFAULT_API_BASE,
+    var proxyEnabled: Boolean = false,
+    var proxyType: String = "HTTP",
+    var proxyHost: String = "",
+    var proxyPort: Int = 7890,
     var targetLanguage: String = "zh",
     var audioSource: String = "mic",
     var fontSize: Int = 16,
@@ -46,6 +50,10 @@ data class AppSettings(
             return AppSettings(
                 apiKey = prefs.getString("api_key", "") ?: "",
                 apiBase = prefs.getString("api_base", DEFAULT_API_BASE) ?: DEFAULT_API_BASE,
+                proxyEnabled = prefs.getBoolean("proxy_enabled", false),
+                proxyType = prefs.getString("proxy_type", "HTTP") ?: "HTTP",
+                proxyHost = prefs.getString("proxy_host", "") ?: "",
+                proxyPort = prefs.getInt("proxy_port", 7890),
                 targetLanguage = prefs.getString("target_language", "zh") ?: "zh",
                 audioSource = prefs.getString("audio_source", "mic") ?: "mic",
                 fontSize = prefs.getInt("font_size", 16),
@@ -63,6 +71,10 @@ data class AppSettings(
         prefs.edit {
             putString("api_key", apiKey)
             putString("api_base", apiBase)
+            putBoolean("proxy_enabled", proxyEnabled)
+            putString("proxy_type", proxyType)
+            putString("proxy_host", proxyHost)
+            putInt("proxy_port", proxyPort)
             putString("target_language", targetLanguage)
             putString("audio_source", audioSource)
             putInt("font_size", fontSize)

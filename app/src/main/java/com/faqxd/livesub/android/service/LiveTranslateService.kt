@@ -62,6 +62,7 @@ class LiveTranslateService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                isActive = true
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
                 @Suppress("DEPRECATION")
                 val resultData: Intent? = intent.getParcelableExtra(EXTRA_RESULT_DATA)
@@ -72,9 +73,7 @@ class LiveTranslateService : Service() {
                 startPipeline(resultCode, resultData)
             }
             ACTION_STOP -> {
-                stopPipeline()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                stopServiceAndOverlay()
             }
             ACTION_TOGGLE -> togglePipeline()
         }
@@ -84,6 +83,9 @@ class LiveTranslateService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         stopPipeline()
+        overlay?.detach()
+        overlay = null
+        isActive = false
         scope.coroutineContext[Job]?.cancel()
     }
 
@@ -119,6 +121,10 @@ class LiveTranslateService : Service() {
             systemPrompt = s.systemPrompt,
             echoTargetLanguage = s.echoTargetLanguage,
             apiBase = s.apiBase,
+            proxyEnabled = s.proxyEnabled,
+            proxyType = s.proxyType,
+            proxyHost = s.proxyHost,
+            proxyPort = s.proxyPort,
         )
 
         // Audio capture
@@ -131,7 +137,7 @@ class LiveTranslateService : Service() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "AudioCapture start failed", e)
-            notifyStatus("Capture error: ${e.message}")
+            notifyStatus(getString(R.string.err_capture, e.message ?: "unknown"))
             player?.stop(); player = null
             return
         }
@@ -139,7 +145,7 @@ class LiveTranslateService : Service() {
         c.start()
         running = true
         overlay?.setRunningState(true)
-        overlay?.setStatus("Connecting...")
+        overlay?.setStatus(getString(R.string.status_connecting))
         updateNotification(running = true)
     }
 
@@ -155,12 +161,33 @@ class LiveTranslateService : Service() {
         client?.stop()
         client = null
         overlay?.setRunningState(false)
-        overlay?.setStatus("Stopped")
+        overlay?.setStatus(getString(R.string.status_stopped))
         updateNotification(running = false)
     }
 
     private fun togglePipeline() {
-        if (running) stopPipeline() else startPipeline(0, null)
+        if (running) {
+            stopPipeline()
+            return
+        }
+        if (settings?.audioSource == "system") {
+            overlay?.setStatus(getString(R.string.perm_system_audio_rationale))
+            startActivity(
+                Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            return
+        }
+        startPipeline(0, null)
+    }
+
+    private fun stopServiceAndOverlay() {
+        stopPipeline()
+        overlay?.detach()
+        overlay = null
+        isActive = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     // ---------- overlay ----------
@@ -177,6 +204,9 @@ class LiveTranslateService : Service() {
                     override fun onClearClicked() {
                         overlay?.clear()
                     }
+                    override fun onCloseClicked() {
+                        stopServiceAndOverlay()
+                    }
                     override fun onSettingsClicked() {
                         startActivity(
                             Intent(this@LiveTranslateService, com.faqxd.livesub.android.SettingsActivity::class.java)
@@ -185,6 +215,7 @@ class LiveTranslateService : Service() {
                     }
                 },
             )
+            overlay?.init()
         }
         overlay?.applyStyle()
         try {
@@ -253,13 +284,13 @@ class LiveTranslateService : Service() {
         }
         override fun onConnected() {
             scope.launch {
-                overlay?.setStatus("Connected")
+                overlay?.setStatus(getString(R.string.status_connected))
                 updateNotification(running = true)
             }
         }
         override fun onDisconnected(reason: String) {
             scope.launch {
-                overlay?.setStatus("Disconnected: $reason".take(80))
+                overlay?.setStatus("${getString(R.string.status_disconnected)}: $reason".take(80))
                 if (running) {
                     running = false
                     capture?.stop(); capture = null
@@ -350,6 +381,8 @@ class LiveTranslateService : Service() {
         const val ACTION_TOGGLE = "com.faqxd.livesub.android.TOGGLE"
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_RESULT_DATA = "result_data"
+        @Volatile var isActive: Boolean = false
+            private set
 
         fun startIntent(context: Context, resultCode: Int, data: Intent?): Intent =
             Intent(context, LiveTranslateService::class.java)

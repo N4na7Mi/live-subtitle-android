@@ -19,20 +19,6 @@ import com.faqxd.livesub.android.data.AppSettings
 import com.faqxd.livesub.android.data.Languages
 import com.faqxd.livesub.android.service.LiveTranslateService
 
-/**
- * Entry Activity.
- *
- * Equivalent of [main.py:LiveBuddyApp.main] on Android:
- *  - Loads [AppSettings].
- *  - Renders an in-app preview of the caption (so users can verify their
- *    settings without enabling the overlay).
- *  - Requests the runtime permissions needed by [LiveTranslateService]:
- *      * RECORD_AUDIO (microphone)
- *      * POST_NOTIFICATIONS (Android 13+)
- *      * SYSTEM_ALERT_WINDOW (overlay)
- *      * MediaProjection token (only if the user chose "system" audio source)
- *  - Starts the service, which displays the floating HUD.
- */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var settings: AppSettings
@@ -57,10 +43,14 @@ class MainActivity : AppCompatActivity() {
 
     private val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        // Notifications are nice-to-have (service still runs without them on
-        // older devices), so we proceed regardless.
+    ) {
         continueStartFlow()
+    }
+
+    private val overlayPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (hasOverlayPermission() && pendingStart) continueStartFlow() else pendingStart = false
     }
 
     private val mediaProjectionLauncher = registerForActivityResult(
@@ -70,20 +60,8 @@ class MainActivity : AppCompatActivity() {
             startServiceWithProjection(result.resultCode, result.data!!)
         } else {
             showHint(getString(R.string.perm_system_audio_rationale))
-            // Fall back to microphone capture so the user still gets *something*.
             startServiceWithProjection(0, null)
         }
-    }
-
-    private fun startServiceWithProjection(resultCode: Int, data: Intent?) {
-        ContextCompat.startForegroundService(
-            this,
-            LiveTranslateService.startIntent(this, resultCode, data)
-        )
-        serviceRunning = true
-        pendingStart = false
-        toggleBtn.text = getString(R.string.stop)
-        hintText.text = "Floating caption overlay will appear on top of other apps."
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -111,14 +89,20 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Refresh settings in case the user changed something in SettingsActivity.
         settings = AppSettings.load(this)
+        serviceRunning = LiveTranslateService.isActive
         applySettingsToUi()
     }
 
     private fun applySettingsToUi() {
-        langBadge.text = "→ ${Languages.nameFor(settings.targetLanguage)}"
+        statusText.text = getString(R.string.status_idle)
+        langBadge.text = "${getString(R.string.lang_badge_prefix)} ${Languages.nameFor(settings.targetLanguage)}"
         inputView.visibility = if (settings.showOriginal) View.VISIBLE else View.GONE
+        outputView.text = getString(R.string.caption_placeholder)
+        toggleBtn.text = getString(if (serviceRunning) R.string.stop else R.string.start)
+        if (serviceRunning) {
+            hintText.text = getString(R.string.main_hint_running)
+        }
         if (settings.apiKey.isBlank()) {
             showHint(getString(R.string.err_no_api_key))
         }
@@ -128,19 +112,22 @@ class MainActivity : AppCompatActivity() {
         if (serviceRunning) {
             stopService(LiveTranslateService.stopIntent(this))
             serviceRunning = false
+            pendingStart = false
             toggleBtn.text = getString(R.string.start)
+            hintText.text = getString(R.string.main_hint_idle)
             return
         }
+
         if (settings.apiKey.isBlank()) {
             showHint(getString(R.string.err_no_api_key))
             startActivity(Intent(this, SettingsActivity::class.java))
             return
         }
+
         pendingStart = true
-        // Permission chain: overlay → mic → notif → (projection if "system")
         if (!hasOverlayPermission()) {
             showHint(getString(R.string.perm_overlay_rationale))
-            startActivity(
+            overlayPermissionLauncher.launch(
                 Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:$packageName"),
@@ -172,7 +159,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (settings.audioSource == "system") {
-            // Need a MediaProjection token. Prompt the user.
             val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             mediaProjectionLauncher.launch(mpm.createScreenCaptureIntent())
         } else {
@@ -180,13 +166,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        // Returning from the SYSTEM_ALERT_WINDOW settings screen
-        if (requestCode == REQ_OVERLAY) {
-            if (hasOverlayPermission() && pendingStart) continueStartFlow()
-            else pendingStart = false
-        }
+    private fun startServiceWithProjection(resultCode: Int, data: Intent?) {
+        ContextCompat.startForegroundService(
+            this,
+            LiveTranslateService.startIntent(this, resultCode, data)
+        )
+        serviceRunning = true
+        pendingStart = false
+        toggleBtn.text = getString(R.string.stop)
+        hintText.text = getString(R.string.main_hint_running)
     }
 
     private fun hasOverlayPermission(): Boolean =
@@ -200,13 +188,11 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
                 PackageManager.PERMISSION_GRANTED
-        } else true
+        } else {
+            true
+        }
 
     private fun showHint(text: String) {
         hintText.text = text
-    }
-
-    companion object {
-        private const val REQ_OVERLAY = 1001
     }
 }
