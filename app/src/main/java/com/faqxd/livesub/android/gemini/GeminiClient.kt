@@ -14,15 +14,6 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
-/**
- * Port of `gemini_client.py:GeminiClient`.
- *
- * Wraps a single Gemini Live WebSocket session on a background OkHttp
- * dispatcher thread. The caller (LiveTranslateService) feeds PCM16 audio
- * chunks via [sendAudio]; transcript / audio / status callbacks arrive on
- * the supplied listener (already on OkHttp's worker thread — callers should
- * hop to the main thread before touching UI).
- */
 class GeminiClient(
     private val listener: Listener,
 ) {
@@ -38,12 +29,13 @@ class GeminiClient(
 
     @Volatile private var ws: WebSocket? = null
     @Volatile private var running = false
+    @Volatile private var ready = false
 
     private var apiKey: String = ""
     private var apiBase: String = DEFAULT_API_BASE
-    private var targetLang: String = "es"
+    private var targetLang: String = "zh"
     private var systemPrompt: String = ""
-    private var echo: Boolean = true
+    private var echo: Boolean = false
     private var proxyEnabled: Boolean = false
     private var proxyType: String = "HTTP"
     private var proxyHost: String = ""
@@ -73,10 +65,10 @@ class GeminiClient(
         this.client = buildClient()
     }
 
-    /** Start a new session. No-op if already running. */
     fun start() {
         if (running) return
         running = true
+        ready = false
 
         val request = Request.Builder().url(buildWsUrl()).build()
         ws = client.newWebSocket(request, object : WebSocketListener() {
@@ -84,11 +76,11 @@ class GeminiClient(
                 listener.onStatus("Gemini socket opened")
                 if (!sendSetup(webSocket)) {
                     running = false
+                    ready = false
                     webSocket.close(1000, "setup failed")
                     return
                 }
-                listener.onStatus("Gemini session ready")
-                listener.onConnected()
+                listener.onStatus("Waiting for Gemini setup")
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -96,13 +88,13 @@ class GeminiClient(
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                // Gemini Live uses text frames only; binary is unexpected.
                 handleText(bytes.utf8())
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.w(TAG, "ws failure", t)
                 running = false
+                ready = false
                 ws = null
                 listener.onStatus("Gemini error: ${t.message ?: "unknown"}")
                 listener.onDisconnected("Error: ${t.message ?: "unknown"}")
@@ -110,25 +102,25 @@ class GeminiClient(
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 running = false
+                ready = false
                 ws = null
                 listener.onDisconnected("Closed: $reason")
             }
         })
     }
 
-    /** Stop the current session. */
     fun stop() {
         if (!running) return
         running = false
+        ready = false
         ws?.close(1000, "client stop")
         ws = null
     }
 
-    /** Thread-safe: enqueue a PCM16 audio chunk for sending. */
     fun sendAudio(pcm16: ByteArray) {
         if (pcm16.isEmpty()) return
         val socket = ws ?: return
-        if (!running) return
+        if (!running || !ready) return
         val b64 = Base64.encodeToString(pcm16, Base64.NO_WRAP)
         val msg = JSONObject().apply {
             put("realtimeInput", JSONObject().apply {
@@ -141,11 +133,8 @@ class GeminiClient(
         socket.send(msg)
     }
 
-    // ---------- internals ----------
-
     private fun buildClient(): OkHttpClient {
         val builder = OkHttpClient.Builder()
-            .pingInterval(15, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS)
 
         if (proxyEnabled && proxyHost.isNotBlank() && proxyPort in 1..65535) {
@@ -164,7 +153,7 @@ class GeminiClient(
         var base = apiBase.ifBlank { DEFAULT_API_BASE }.trimEnd('/')
         base = when {
             base.startsWith("https://") -> "wss://" + base.removePrefix("https://")
-            base.startsWith("http://")  -> "ws://"  + base.removePrefix("http://")
+            base.startsWith("http://") -> "ws://" + base.removePrefix("http://")
             else -> base
         }
         return "$base$GEMINI_WS_PATH?key=$apiKey"
@@ -174,27 +163,41 @@ class GeminiClient(
         val setup = JSONObject().apply {
             put("model", GEMINI_MODEL)
             put("generationConfig", JSONObject().apply {
-                put("responseModalities", JSONArray().apply { put("AUDIO") })
+                put("responseModalities", JSONArray().apply { put(if (echo) "AUDIO" else "TEXT") })
                 put("translationConfig", JSONObject().apply {
                     put("targetLanguageCode", targetLang)
                     put("echoTargetLanguage", echo)
                 })
             })
             put("inputAudioTranscription", JSONObject())
-            put("outputAudioTranscription", JSONObject())
+            if (echo) {
+                put("outputAudioTranscription", JSONObject())
+            }
             put("contextWindowCompression", JSONObject().apply {
                 put("triggerTokens", "0")
                 put("slidingWindow", JSONObject().apply { put("targetTokens", "0") })
             })
         }
-        val instruction = systemPrompt.trim()
+
+        val instruction = buildSystemInstruction()
         if (instruction.isNotEmpty()) {
             setup.put("systemInstruction", JSONObject().apply {
                 put("parts", JSONArray().apply { put(JSONObject().put("text", instruction)) })
             })
         }
-        val envelope = JSONObject().put("setup", setup).toString()
-        return socket.send(envelope)
+
+        return socket.send(JSONObject().put("setup", setup).toString())
+    }
+
+    private fun buildSystemInstruction(): String {
+        val defaultInstruction = if (echo) {
+            ""
+        } else {
+            "Translate all incoming speech to target language code '$targetLang'. Return only the translated subtitle text."
+        }
+        return listOf(defaultInstruction, systemPrompt.trim())
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
     }
 
     private fun handleText(raw: String) {
@@ -205,19 +208,23 @@ class GeminiClient(
             return
         }
 
-        // Error
         root.optJSONObject("error")?.let { err ->
             val msg = err.optString("message", "Unknown")
             listener.onStatus("Gemini error: $msg")
             listener.onDisconnected(msg)
             running = false
+            ready = false
             ws?.close(1000, "server error")
             ws = null
             return
         }
 
-        // setupComplete — bare ack
-        if (root.has("setupComplete")) return
+        if (root.has("setupComplete")) {
+            ready = true
+            listener.onStatus("Gemini session ready")
+            listener.onConnected()
+            return
+        }
 
         val content = root.optJSONObject("serverContent") ?: return
 
@@ -239,9 +246,9 @@ class GeminiClient(
                     val data = inline.optString("data", "")
                     if (data.isNotEmpty()) {
                         try {
-                            val audio = Base64.decode(data, Base64.DEFAULT)
-                            listener.onAudioChunk(audio)
-                        } catch (_: Exception) { /* ignore malformed */ }
+                            listener.onAudioChunk(Base64.decode(data, Base64.DEFAULT))
+                        } catch (_: Exception) {
+                        }
                     }
                 }
                 val text = part.optString("text", "")

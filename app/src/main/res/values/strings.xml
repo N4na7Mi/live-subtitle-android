@@ -12,6 +12,8 @@
     <string name="pause">暂停</string>
     <string name="stop">停止</string>
     <string name="close">关闭</string>
+    <string name="minimize">收起</string>
+    <string name="expand">展开</string>
     <string name="clear">清空</string>
     <string name="open_settings">设置</string>
     <string name="status_idle">待机</string>

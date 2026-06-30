@@ -42,9 +42,11 @@ class CaptionOverlayView(
     private lateinit var statusDot: View
     private lateinit var statusTextView: TextView
     private lateinit var langBadge: TextView
+    private lateinit var minimizeBtn: Button
     private lateinit var outputView: TextView
     private lateinit var divider: View
     private lateinit var inputView: TextView
+    private lateinit var controlsRow: View
     private lateinit var toggleBtn: Button
     private lateinit var clearBtn: Button
     private lateinit var closeBtn: Button
@@ -56,6 +58,7 @@ class CaptionOverlayView(
     private var layoutParams: WindowManager.LayoutParams = buildLayoutParams()
     private var attached = false
     private var initialized = false
+    private var collapsed = false
 
     val isAttached: Boolean get() = attached
 
@@ -65,15 +68,18 @@ class CaptionOverlayView(
         statusDot = rootView.findViewById(R.id.overlayStatusDot)
         statusTextView = rootView.findViewById(R.id.overlayStatusText)
         langBadge = rootView.findViewById(R.id.overlayLangBadge)
+        minimizeBtn = rootView.findViewById(R.id.overlayMinimizeBtn)
         outputView = rootView.findViewById(R.id.overlayOutput)
         divider = rootView.findViewById(R.id.overlayDivider)
         inputView = rootView.findViewById(R.id.overlayInput)
+        controlsRow = rootView.findViewById(R.id.overlayControlsRow)
         toggleBtn = rootView.findViewById(R.id.overlayToggleBtn)
         clearBtn = rootView.findViewById(R.id.overlayClearBtn)
         closeBtn = rootView.findViewById(R.id.overlayCloseBtn)
         settingsBtn = rootView.findViewById(R.id.overlaySettingsBtn)
 
         toggleBtn.setOnClickListener { callbacks.onToggleClicked() }
+        minimizeBtn.setOnClickListener { toggleCollapsed() }
         clearBtn.setOnClickListener { callbacks.onClearClicked() }
         closeBtn.setOnClickListener { callbacks.onCloseClicked() }
         settingsBtn.setOnClickListener { callbacks.onSettingsClicked() }
@@ -165,7 +171,23 @@ class CaptionOverlayView(
         divider.visibility = if (showOrig) View.VISIBLE else View.GONE
         inputView.visibility = if (showOrig) View.VISIBLE else View.GONE
         rootView.alpha = 0.4f + 0.6f * settings.bgOpacity.coerceIn(0f, 1f)
+        applyCollapsedState()
         refreshStatus()
+    }
+
+    private fun toggleCollapsed() {
+        collapsed = !collapsed
+        applyCollapsedState()
+    }
+
+    private fun applyCollapsedState() {
+        if (!initialized) return
+        minimizeBtn.text = context.getString(if (collapsed) R.string.expand else R.string.minimize)
+        outputView.visibility = if (collapsed) View.GONE else View.VISIBLE
+        controlsRow.visibility = if (collapsed) View.GONE else View.VISIBLE
+        val showInput = !collapsed && settings.showOriginal
+        divider.visibility = if (showInput) View.VISIBLE else View.GONE
+        inputView.visibility = if (showInput) View.VISIBLE else View.GONE
     }
 
     private fun refreshOutput() {
