@@ -1,6 +1,7 @@
 package com.faqxd.livesub.android.service
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -15,7 +16,6 @@ import android.widget.ImageButton
 import android.widget.TextView
 import com.faqxd.livesub.android.R
 import com.faqxd.livesub.android.data.AppSettings
-import com.faqxd.livesub.android.data.Languages
 import kotlin.math.abs
 
 class CaptionOverlayView(
@@ -26,7 +26,8 @@ class CaptionOverlayView(
 
     interface Callbacks {
         fun onToggleClicked()
-        fun onClearClicked()
+        fun onRestartClicked()
+        fun onLogClicked()
         fun onCloseClicked()
         fun onSettingsClicked()
     }
@@ -47,6 +48,8 @@ class CaptionOverlayView(
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private lateinit var rootView: View
+    private lateinit var overlayRoot: View
+    private lateinit var collapsedBall: TextView
     private lateinit var headerRow: View
     private lateinit var statusDot: View
     private lateinit var statusTextView: TextView
@@ -57,10 +60,15 @@ class CaptionOverlayView(
     private lateinit var divider: View
     private lateinit var inputView: TextView
     private lateinit var controlsRow: View
+    private lateinit var toolsRow: View
     private lateinit var toggleBtn: Button
-    private lateinit var clearBtn: Button
+    private lateinit var restartBtn: Button
+    private lateinit var logBtn: Button
     private lateinit var closeBtn: Button
     private lateinit var settingsBtn: ImageButton
+    private lateinit var fontMinusBtn: Button
+    private lateinit var fontPlusBtn: Button
+    private lateinit var resizeHandle: TextView
 
     private val windowManager: WindowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -78,6 +86,8 @@ class CaptionOverlayView(
     fun init() {
         if (initialized) return
         rootView = View.inflate(context, R.layout.overlay_caption, null)
+        overlayRoot = rootView.findViewById(R.id.overlayRoot)
+        collapsedBall = rootView.findViewById(R.id.overlayBall)
         headerRow = rootView.findViewById(R.id.overlayHeaderRow)
         statusDot = rootView.findViewById(R.id.overlayStatusDot)
         statusTextView = rootView.findViewById(R.id.overlayStatusText)
@@ -88,10 +98,15 @@ class CaptionOverlayView(
         divider = rootView.findViewById(R.id.overlayDivider)
         inputView = rootView.findViewById(R.id.overlayInput)
         controlsRow = rootView.findViewById(R.id.overlayControlsRow)
+        toolsRow = rootView.findViewById(R.id.overlayToolsRow)
         toggleBtn = rootView.findViewById(R.id.overlayToggleBtn)
-        clearBtn = rootView.findViewById(R.id.overlayClearBtn)
+        restartBtn = rootView.findViewById(R.id.overlayRestartBtn)
+        logBtn = rootView.findViewById(R.id.overlayLogBtn)
         closeBtn = rootView.findViewById(R.id.overlayCloseBtn)
         settingsBtn = rootView.findViewById(R.id.overlaySettingsBtn)
+        fontMinusBtn = rootView.findViewById(R.id.overlayFontMinusBtn)
+        fontPlusBtn = rootView.findViewById(R.id.overlayFontPlusBtn)
+        resizeHandle = rootView.findViewById(R.id.overlayResizeHandle)
 
         toggleBtn.setOnClickListener {
             showChromeTemporarily()
@@ -105,17 +120,30 @@ class CaptionOverlayView(
             toggleCollapsed()
             showChromeTemporarily()
         }
-        clearBtn.setOnClickListener {
+        restartBtn.setOnClickListener {
             showChromeTemporarily()
-            callbacks.onClearClicked()
+            callbacks.onRestartClicked()
+        }
+        logBtn.setOnClickListener {
+            showChromeTemporarily()
+            callbacks.onLogClicked()
         }
         closeBtn.setOnClickListener { callbacks.onCloseClicked() }
         settingsBtn.setOnClickListener {
             showChromeTemporarily()
             callbacks.onSettingsClicked()
         }
+        fontMinusBtn.setOnClickListener {
+            adjustFontSize(-2)
+            showChromeTemporarily()
+        }
+        fontPlusBtn.setOnClickListener {
+            adjustFontSize(2)
+            showChromeTemporarily()
+        }
 
         installDragHandler()
+        installResizeHandler()
         initialized = true
         applyStyle()
         applyLockState()
@@ -183,7 +211,6 @@ class CaptionOverlayView(
         } else {
             inDraft = t
         }
-        refreshInput()
     }
 
     fun setStatus(status: String?) {
@@ -207,7 +234,6 @@ class CaptionOverlayView(
         inputRenderTarget = ""
         cancelTextAnimations()
         refreshOutput()
-        refreshInput()
     }
 
     fun setRunningState(running: Boolean) {
@@ -216,19 +242,28 @@ class CaptionOverlayView(
 
     fun applyStyle() {
         if (!initialized) return
+        rootView.alpha = 1f
         outputView.setTextSize(TypedValue.COMPLEX_UNIT_SP, settings.fontSize.toFloat())
-        inputView.setTextSize(TypedValue.COMPLEX_UNIT_SP, settings.fontSize * 0.6f)
-        langBadge.text = "${context.getString(R.string.lang_badge_prefix)} ${Languages.nameFor(settings.targetLanguage)}"
-        val showOrig = settings.showOriginal
-        divider.visibility = if (showOrig) View.VISIBLE else View.GONE
-        inputView.visibility = if (showOrig) View.VISIBLE else View.GONE
-        rootView.alpha = 0.4f + 0.6f * settings.bgOpacity.coerceIn(0f, 1f)
+        outputView.maxLines = settings.subtitleMaxLines
+        outputView.setTextColor(
+            Color.argb((255 * settings.captionOpacity.coerceIn(0.2f, 1f)).toInt(), 255, 255, 255)
+        )
+        overlayRoot.background?.mutate()?.setAlpha(
+            (255 * (0.22f + 0.78f * settings.bgOpacity.coerceIn(0f, 1f))).toInt()
+        )
+        langBadge.visibility = View.GONE
+        divider.visibility = View.GONE
+        inputView.visibility = View.GONE
         applyCollapsedState()
         refreshStatus()
+        refreshOutput()
     }
 
     private fun toggleCollapsed() {
         collapsed = !collapsed
+        if (!collapsed) {
+            showChromeTemporarily()
+        }
         applyCollapsedState()
     }
 
@@ -245,11 +280,20 @@ class CaptionOverlayView(
     private fun applyCollapsedState() {
         if (!initialized) return
         minimizeBtn.text = context.getString(if (collapsed) R.string.expand else R.string.minimize)
+        if (collapsed) {
+            cancelChromeTimer()
+            overlayRoot.visibility = View.GONE
+            collapsedBall.visibility = View.VISIBLE
+            setWindowSize(dp(BALL_SIZE_DP), dp(BALL_SIZE_DP), save = false)
+            return
+        }
+        collapsedBall.visibility = View.GONE
+        overlayRoot.visibility = View.VISIBLE
+        setWindowSize(normalWidthPx(), normalHeightPx(), save = false)
         applyChromeState()
-        outputView.visibility = if (collapsed) View.GONE else View.VISIBLE
-        val showInput = !collapsed && settings.showOriginal
-        divider.visibility = if (showInput) View.VISIBLE else View.GONE
-        inputView.visibility = if (showInput) View.VISIBLE else View.GONE
+        outputView.visibility = View.VISIBLE
+        divider.visibility = View.GONE
+        inputView.visibility = View.GONE
     }
 
     private fun toggleChrome() {
@@ -275,8 +319,10 @@ class CaptionOverlayView(
 
     private fun applyChromeState() {
         if (!initialized) return
+        if (collapsed) return
         headerRow.visibility = if (chromeVisible || collapsed) View.VISIBLE else View.GONE
         controlsRow.visibility = if (chromeVisible && !collapsed) View.VISIBLE else View.GONE
+        toolsRow.visibility = if (chromeVisible && !collapsed) View.VISIBLE else View.GONE
     }
 
     private fun scheduleChromeAutoHide() {
@@ -291,12 +337,18 @@ class CaptionOverlayView(
         hideChromeRunnable = null
     }
 
+    private fun adjustFontSize(delta: Int) {
+        settings.fontSize = AppSettings.normalizeFontSize(settings.fontSize + delta)
+        settings.save(context)
+        applyStyle()
+    }
+
     private fun refreshOutput() {
         var text = outCommitted
         if (outDraft.isNotEmpty()) {
             text = (text + "\n" + outDraft).trim('\n')
         }
-        text = latestLines(text, OUTPUT_VISIBLE_LINES)
+        text = compactSubtitle(text)
         if (text.isEmpty()) text = context.getString(R.string.caption_placeholder)
         setTextAnimated(outputView, text, isOutput = true)
     }
@@ -374,6 +426,49 @@ class CaptionOverlayView(
             .takeLast(maxLines)
             .joinToString("\n")
 
+    private fun compactSubtitle(text: String): String {
+        val maxLines = AppSettings.normalizeSubtitleMaxLines(settings.subtitleMaxLines)
+        val segments = text.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toList()
+            .takeLast(maxLines * 4 + 2)
+        if (segments.isEmpty()) return ""
+
+        val joined = buildString {
+            for (segment in segments) {
+                if (isEmpty()) {
+                    append(segment)
+                } else {
+                    val previous = last()
+                    val next = segment.first()
+                    if (needsSpace(previous, next)) append(' ')
+                    append(segment)
+                }
+            }
+        }.trim()
+
+        val limit = (maxLines * 72).coerceAtLeast(80)
+        return if (joined.length > limit) joined.takeLast(limit).trimStart() else joined
+    }
+
+    private fun needsSpace(previous: Char, next: Char): Boolean {
+        if (next in setOf('.', ',', '!', '?', ';', ':', '，', '。', '！', '？', '、')) return false
+        if (isCjk(previous) || isCjk(next)) return false
+        return previous.isLetterOrDigit() && next.isLetterOrDigit()
+    }
+
+    private fun isCjk(char: Char): Boolean {
+        val block = Character.UnicodeBlock.of(char)
+        return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
+            block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
+            block == Character.UnicodeBlock.HIRAGANA ||
+            block == Character.UnicodeBlock.KATAKANA ||
+            block == Character.UnicodeBlock.HANGUL_SYLLABLES ||
+            block == Character.UnicodeBlock.HANGUL_JAMO ||
+            block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
+    }
+
     private fun refreshStatus() {
         if (statusTextView.text.toString() != statusText) {
             statusTextView.text = statusText.ifBlank { context.getString(R.string.status_idle) }
@@ -395,8 +490,8 @@ class CaptionOverlayView(
             WindowManager.LayoutParams.TYPE_PHONE
         }
         return WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            normalWidthPx(),
+            normalHeightPx(),
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
@@ -408,6 +503,45 @@ class CaptionOverlayView(
             y = 90
         }
     }
+
+    private fun normalWidthPx(): Int {
+        val maxWidth = context.resources.displayMetrics.widthPixels - dp(24)
+        return clampDimension(dp(AppSettings.normalizeOverlayWidth(settings.overlayWidthDp)), dp(260), maxWidth)
+    }
+
+    private fun normalHeightPx(): Int {
+        val maxHeight = (context.resources.displayMetrics.heightPixels * 0.55f).toInt()
+        return clampDimension(dp(AppSettings.normalizeOverlayHeight(settings.overlayHeightDp)), dp(96), maxHeight)
+    }
+
+    private fun setWindowSize(widthPx: Int, heightPx: Int, save: Boolean) {
+        layoutParams.width = widthPx
+        layoutParams.height = heightPx
+        if (attached) {
+            try {
+                windowManager.updateViewLayout(rootView, layoutParams)
+            } catch (_: Exception) {
+            }
+        }
+        if (save && !collapsed) {
+            settings.overlayWidthDp = AppSettings.normalizeOverlayWidth(pxToDp(widthPx))
+            settings.overlayHeightDp = AppSettings.normalizeOverlayHeight(pxToDp(heightPx))
+            settings.save(context)
+        }
+    }
+
+    private fun dp(value: Int): Int =
+        TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            value.toFloat(),
+            context.resources.displayMetrics
+        ).toInt()
+
+    private fun pxToDp(value: Int): Int =
+        (value / context.resources.displayMetrics.density).toInt()
+
+    private fun clampDimension(value: Int, min: Int, max: Int): Int =
+        if (max < min) max.coerceAtLeast(1) else value.coerceIn(min, max)
 
     private fun installDragHandler() {
         var initialX = 0
@@ -446,7 +580,49 @@ class CaptionOverlayView(
                 MotionEvent.ACTION_UP -> {
                     val wasDragging = dragging
                     dragging = false
-                    if (!wasDragging) toggleChrome()
+                    if (!wasDragging) {
+                        if (collapsed) toggleCollapsed() else toggleChrome()
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun installResizeHandler() {
+        var initialWidth = 0
+        var initialHeight = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+
+        resizeHandle.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (locked || collapsed) return@setOnTouchListener true
+                    initialWidth = layoutParams.width
+                    initialHeight = layoutParams.height
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    cancelChromeTimer()
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (locked || collapsed) return@setOnTouchListener true
+                    val width = initialWidth + (event.rawX - initialTouchX).toInt()
+                    val height = initialHeight + (event.rawY - initialTouchY).toInt()
+                    setWindowSize(
+                        clampDimension(width, dp(260), context.resources.displayMetrics.widthPixels - dp(24)),
+                        clampDimension(height, dp(96), (context.resources.displayMetrics.heightPixels * 0.55f).toInt()),
+                        save = false
+                    )
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (!locked && !collapsed) {
+                        setWindowSize(layoutParams.width, layoutParams.height, save = true)
+                        showChromeTemporarily()
+                    }
                     true
                 }
                 else -> false
@@ -455,8 +631,8 @@ class CaptionOverlayView(
     }
 
     companion object {
-        private const val OUTPUT_VISIBLE_LINES = 8
         private const val INPUT_VISIBLE_LINES = 6
+        private const val BALL_SIZE_DP = 56
         private const val CHROME_AUTO_HIDE_MS = 4500L
     }
 }

@@ -37,9 +37,9 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var audioSampleRateSpinner: Spinner
     private lateinit var volumeSlider: SeekBar
     private lateinit var echoCheck: CheckBox
-    private lateinit var fontSlider: SeekBar
     private lateinit var opacitySlider: SeekBar
-    private lateinit var showOriginalCheck: CheckBox
+    private lateinit var captionOpacitySlider: SeekBar
+    private lateinit var subtitleLinesSpinner: Spinner
     private lateinit var promptEdit: EditText
     private lateinit var saveBtn: Button
     private lateinit var cancelBtn: Button
@@ -69,9 +69,9 @@ class SettingsActivity : AppCompatActivity() {
         audioSampleRateSpinner = findViewById(R.id.audioSampleRateSpinner)
         volumeSlider = findViewById(R.id.volumeSlider)
         echoCheck = findViewById(R.id.echoCheck)
-        fontSlider = findViewById(R.id.fontSlider)
         opacitySlider = findViewById(R.id.opacitySlider)
-        showOriginalCheck = findViewById(R.id.showOriginalCheck)
+        captionOpacitySlider = findViewById(R.id.captionOpacitySlider)
+        subtitleLinesSpinner = findViewById(R.id.subtitleLinesSpinner)
         promptEdit = findViewById(R.id.promptEdit)
         saveBtn = findViewById(R.id.saveBtn)
         cancelBtn = findViewById(R.id.cancelBtn)
@@ -153,10 +153,16 @@ class SettingsActivity : AppCompatActivity() {
 
         volumeSlider.progress = (settings.playbackVolume * 100).toInt()
         echoCheck.isChecked = settings.echoTargetLanguage
-        // Range 14..60, so shift by 14
-        fontSlider.progress = (settings.fontSize - 14).coerceIn(0, 46)
         opacitySlider.progress = (settings.bgOpacity * 100).toInt()
-        showOriginalCheck.isChecked = settings.showOriginal
+        captionOpacitySlider.progress = (settings.captionOpacity * 100).toInt()
+        subtitleLinesSpinner.adapter = ArrayAdapter(
+            this, android.R.layout.simple_spinner_dropdown_item,
+            AppSettings.SUBTITLE_LINE_OPTIONS.map { subtitleLineLabel(it) }
+        )
+        val lineSelection = AppSettings.SUBTITLE_LINE_OPTIONS
+            .indexOf(AppSettings.normalizeSubtitleMaxLines(settings.subtitleMaxLines))
+            .coerceAtLeast(0)
+        subtitleLinesSpinner.setSelection(lineSelection)
         promptEdit.setText(settings.systemPrompt)
     }
 
@@ -199,9 +205,11 @@ class SettingsActivity : AppCompatActivity() {
             .getOrElse(audioSampleRateSpinner.selectedItemPosition) { AppSettings.DEFAULT_AUDIO_SAMPLE_RATE }
         settings.playbackVolume = volumeSlider.progress / 100f
         settings.echoTargetLanguage = echoCheck.isChecked
-        settings.fontSize = (fontSlider.progress + 14).coerceIn(14, 60)
         settings.bgOpacity = opacitySlider.progress / 100f
-        settings.showOriginal = showOriginalCheck.isChecked
+        settings.captionOpacity = (captionOpacitySlider.progress / 100f).coerceIn(0.2f, 1f)
+        settings.subtitleMaxLines = AppSettings.SUBTITLE_LINE_OPTIONS
+            .getOrElse(subtitleLinesSpinner.selectedItemPosition) { AppSettings.DEFAULT_SUBTITLE_MAX_LINES }
+        settings.showOriginal = false
         settings.systemPrompt = promptEdit.text.toString().trim()
         return true
     }
@@ -222,5 +230,11 @@ class SettingsActivity : AppCompatActivity() {
         16000 -> "16 kHz（推荐）"
         24000 -> "24 kHz"
         else -> "48 kHz（高带宽）"
+    }
+
+    private fun subtitleLineLabel(lines: Int): String = when (lines) {
+        1 -> "1 行（最干净）"
+        2 -> "2 行（推荐）"
+        else -> "$lines 行"
     }
 }

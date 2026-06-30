@@ -20,9 +20,11 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.faqxd.livesub.android.MainActivity
 import com.faqxd.livesub.android.R
+import com.faqxd.livesub.android.SessionLogActivity
 import com.faqxd.livesub.android.audio.AudioCapture
 import com.faqxd.livesub.android.audio.AudioPlayer
 import com.faqxd.livesub.android.data.AppSettings
+import com.faqxd.livesub.android.data.SessionLogStore
 import com.faqxd.livesub.android.gemini.GeminiClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +57,7 @@ class LiveTranslateService : Service() {
     private var capture: AudioCapture? = null
     private var player: AudioPlayer? = null
     private var mediaProjection: MediaProjection? = null
+    private var clientGeneration = 0
     @Volatile private var running = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -113,21 +116,10 @@ class LiveTranslateService : Service() {
             }
         }
 
+        SessionLogStore.startSession(this)
+
         // Gemini client
-        val c = GeminiClient(listener = createClientListener()).also { client = it }
-        c.configure(
-            apiKey = s.apiKey,
-            sourceLang = s.sourceLanguage,
-            targetLang = s.targetLanguage,
-            inputAudioRate = s.audioSampleRate,
-            systemPrompt = s.systemPrompt,
-            echoTargetLanguage = s.echoTargetLanguage,
-            apiBase = s.apiBase,
-            proxyEnabled = s.proxyEnabled,
-            proxyType = s.proxyType,
-            proxyHost = s.proxyHost,
-            proxyPort = s.proxyPort,
-        )
+        val c = createConfiguredClient(s).also { client = it }
 
         running = true
         overlay?.setRunningState(true)
@@ -141,7 +133,7 @@ class LiveTranslateService : Service() {
 
         // Audio capture
         val cap = AudioCapture(
-            onChunk = { pcm16 -> c.sendAudio(pcm16) },
+            onChunk = { pcm16 -> client?.sendAudio(pcm16) },
             chunkMs = s.audioChunkMs,
             targetRate = s.audioSampleRate,
         ).also { capture = it }
@@ -170,6 +162,7 @@ class LiveTranslateService : Service() {
         player = null
         try { mediaProjection?.stop() } catch (_: Exception) {}
         mediaProjection = null
+        clientGeneration++
         client?.stop()
         client = null
         overlay?.setRunningState(false)
@@ -185,10 +178,55 @@ class LiveTranslateService : Service() {
         player = null
         try { mediaProjection?.stop() } catch (_: Exception) {}
         mediaProjection = null
+        clientGeneration++
         client?.stop()
         client = null
         overlay?.setRunningState(false)
         updateNotification(running = false)
+    }
+
+    private fun createConfiguredClient(s: AppSettings): GeminiClient =
+        GeminiClient(listener = createClientListener(++clientGeneration)).also { c ->
+            c.configure(
+                apiKey = s.apiKey,
+                sourceLang = s.sourceLanguage,
+                targetLang = s.targetLanguage,
+                inputAudioRate = s.audioSampleRate,
+                systemPrompt = s.systemPrompt,
+                echoTargetLanguage = s.echoTargetLanguage,
+                apiBase = s.apiBase,
+                proxyEnabled = s.proxyEnabled,
+                proxyType = s.proxyType,
+                proxyHost = s.proxyHost,
+                proxyPort = s.proxyPort,
+            )
+        }
+
+    private fun restartSession() {
+        if (!running || capture == null) {
+            overlay?.setStatus(getString(R.string.restart_requires_running))
+            overlay?.setRunningState(false)
+            return
+        }
+
+        val s = AppSettings.load(this).also { settings = it }
+        overlay?.clear()
+        overlay?.setStatus(getString(R.string.status_restarting_session))
+        SessionLogStore.startSession(this)
+
+        val old = client
+        client = null
+        clientGeneration++
+        old?.stop()
+
+        val next = createConfiguredClient(s).also { client = it }
+        if (!next.start()) {
+            cleanupAfterPipelineFailure()
+            return
+        }
+        running = true
+        overlay?.setRunningState(true)
+        updateNotification(running = true)
     }
 
     private fun togglePipeline() {
@@ -227,8 +265,14 @@ class LiveTranslateService : Service() {
                     override fun onToggleClicked() {
                         togglePipeline()
                     }
-                    override fun onClearClicked() {
-                        overlay?.clear()
+                    override fun onRestartClicked() {
+                        restartSession()
+                    }
+                    override fun onLogClicked() {
+                        startActivity(
+                            Intent(this@LiveTranslateService, SessionLogActivity::class.java)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
                     }
                     override fun onCloseClicked() {
                         stopServiceAndOverlay()
@@ -293,28 +337,35 @@ class LiveTranslateService : Service() {
 
     // ---------- gemini listener (forwards to overlay on main thread) ----------
 
-    private fun createClientListener() = object : GeminiClient.Listener {
+    private fun createClientListener(generation: Int) = object : GeminiClient.Listener {
         override fun onInputTranscript(text: String) {
-            scope.launch { overlay?.setInput(text) }
+            if (generation != clientGeneration) return
+            SessionLogStore.appendInput(this@LiveTranslateService, text)
         }
         override fun onOutputTranscript(text: String) {
+            if (generation != clientGeneration) return
+            SessionLogStore.appendOutput(this@LiveTranslateService, text)
             scope.launch { overlay?.setOutput(text) }
         }
         override fun onAudioChunk(pcm16: ByteArray) {
+            if (generation != clientGeneration) return
             // AudioTrack writes are blocking; do them on a dedicated thread
             // (OkHttp dispatcher in this case) to avoid stalling the WS reader.
             player?.enqueuePcm16(pcm16)
         }
         override fun onStatus(status: String) {
+            if (generation != clientGeneration) return
             scope.launch { overlay?.setStatus(status) }
         }
         override fun onConnected() {
+            if (generation != clientGeneration) return
             scope.launch {
                 overlay?.setStatus(getString(R.string.status_connected))
                 updateNotification(running = true)
             }
         }
         override fun onDisconnected(reason: String) {
+            if (generation != clientGeneration) return
             scope.launch {
                 running = false
                 try { capture?.stop() } catch (_: Exception) {}

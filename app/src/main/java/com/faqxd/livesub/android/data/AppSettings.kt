@@ -22,6 +22,10 @@ import androidx.core.content.edit
  *  - audioSampleRate     — PCM sample rate sent to Gemini.
  *  - fontSize            — Caption font size in sp.
  *  - bgOpacity           — 0..1 background alpha for the overlay card.
+ *  - captionOpacity      — 0..1 caption text alpha.
+ *  - subtitleMaxLines    — Max visual lines in the floating subtitle.
+ *  - overlayWidthDp      — Floating subtitle window width.
+ *  - overlayHeightDp     — Floating subtitle window height.
  *  - echoTargetLanguage  — Whether to play back the translated audio.
  *  - playbackVolume      — 0..1 playback volume.
  *  - systemPrompt        — Optional custom instructions for the model.
@@ -41,6 +45,10 @@ data class AppSettings(
     var audioSampleRate: Int = DEFAULT_AUDIO_SAMPLE_RATE,
     var fontSize: Int = 16,
     var bgOpacity: Float = 0.6f,
+    var captionOpacity: Float = 1.0f,
+    var subtitleMaxLines: Int = DEFAULT_SUBTITLE_MAX_LINES,
+    var overlayWidthDp: Int = DEFAULT_OVERLAY_WIDTH_DP,
+    var overlayHeightDp: Int = DEFAULT_OVERLAY_HEIGHT_DP,
     var echoTargetLanguage: Boolean = false,
     var playbackVolume: Float = 0.8f,
     var systemPrompt: String = "",
@@ -50,8 +58,12 @@ data class AppSettings(
         const val DEFAULT_API_BASE = "https://generativelanguage.googleapis.com"
         const val DEFAULT_AUDIO_CHUNK_MS = 200
         const val DEFAULT_AUDIO_SAMPLE_RATE = 16000
+        const val DEFAULT_SUBTITLE_MAX_LINES = 2
+        const val DEFAULT_OVERLAY_WIDTH_DP = 360
+        const val DEFAULT_OVERLAY_HEIGHT_DP = 190
         val AUDIO_CHUNK_MS_OPTIONS = intArrayOf(100, 200, 300, 500)
         val AUDIO_SAMPLE_RATE_OPTIONS = intArrayOf(16000, 24000, 48000)
+        val SUBTITLE_LINE_OPTIONS = intArrayOf(1, 2, 3, 4)
         private const val PREFS_NAME = "livebuddy_settings"
 
         fun normalizeAudioChunkMs(value: Int): Int = when {
@@ -74,6 +86,15 @@ data class AppSettings(
             return best
         }
 
+        fun normalizeSubtitleMaxLines(value: Int): Int =
+            value.coerceIn(SUBTITLE_LINE_OPTIONS.first(), SUBTITLE_LINE_OPTIONS.last())
+
+        fun normalizeFontSize(value: Int): Int = value.coerceIn(14, 60)
+
+        fun normalizeOverlayWidth(value: Int): Int = value.coerceIn(260, 720)
+
+        fun normalizeOverlayHeight(value: Int): Int = value.coerceIn(96, 520)
+
         fun load(context: Context): AppSettings {
             val prefs: SharedPreferences =
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -95,8 +116,18 @@ data class AppSettings(
                 audioSampleRate = normalizeAudioSampleRate(
                     prefs.getInt("audio_sample_rate", DEFAULT_AUDIO_SAMPLE_RATE)
                 ),
-                fontSize = prefs.getInt("font_size", 16),
+                fontSize = normalizeFontSize(prefs.getInt("font_size", 16)),
                 bgOpacity = prefs.getFloat("bg_opacity", 0.6f),
+                captionOpacity = prefs.getFloat("caption_opacity", 1.0f).coerceIn(0.2f, 1.0f),
+                subtitleMaxLines = normalizeSubtitleMaxLines(
+                    prefs.getInt("subtitle_max_lines", DEFAULT_SUBTITLE_MAX_LINES)
+                ),
+                overlayWidthDp = normalizeOverlayWidth(
+                    prefs.getInt("overlay_width_dp", DEFAULT_OVERLAY_WIDTH_DP)
+                ),
+                overlayHeightDp = normalizeOverlayHeight(
+                    prefs.getInt("overlay_height_dp", DEFAULT_OVERLAY_HEIGHT_DP)
+                ),
                 echoTargetLanguage = prefs.getBoolean("echo_target", false),
                 playbackVolume = prefs.getFloat("playback_volume", 0.8f),
                 systemPrompt = prefs.getString("system_prompt", "") ?: "",
@@ -119,8 +150,12 @@ data class AppSettings(
             putString("audio_source", audioSource)
             putInt("audio_chunk_ms", normalizeAudioChunkMs(audioChunkMs))
             putInt("audio_sample_rate", normalizeAudioSampleRate(audioSampleRate))
-            putInt("font_size", fontSize)
-            putFloat("bg_opacity", bgOpacity)
+            putInt("font_size", normalizeFontSize(fontSize))
+            putFloat("bg_opacity", bgOpacity.coerceIn(0f, 1f))
+            putFloat("caption_opacity", captionOpacity.coerceIn(0.2f, 1f))
+            putInt("subtitle_max_lines", normalizeSubtitleMaxLines(subtitleMaxLines))
+            putInt("overlay_width_dp", normalizeOverlayWidth(overlayWidthDp))
+            putInt("overlay_height_dp", normalizeOverlayHeight(overlayHeightDp))
             putBoolean("echo_target", echoTargetLanguage)
             putFloat("playback_volume", playbackVolume)
             putString("system_prompt", systemPrompt)

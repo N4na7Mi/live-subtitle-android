@@ -16,7 +16,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.faqxd.livesub.android.data.AppSettings
-import com.faqxd.livesub.android.data.Languages
 import com.faqxd.livesub.android.service.LiveTranslateService
 
 class MainActivity : AppCompatActivity() {
@@ -96,8 +95,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun applySettingsToUi() {
         statusText.text = getString(R.string.status_idle)
-        langBadge.text = "${getString(R.string.lang_badge_prefix)} ${Languages.nameFor(settings.targetLanguage)}"
-        inputView.visibility = if (settings.showOriginal) View.VISIBLE else View.GONE
+        langBadge.visibility = View.GONE
+        inputView.visibility = View.GONE
         outputView.text = getString(R.string.caption_placeholder)
         toggleBtn.text = getString(if (serviceRunning) R.string.stop else R.string.start)
         if (serviceRunning) {

@@ -17,12 +17,19 @@
     <string name="minimize">收起</string>
     <string name="expand">展开</string>
     <string name="clear">清屏</string>
+    <string name="restart_session">重开</string>
+    <string name="session_log">记录</string>
+    <string name="overlay_ball_text">字</string>
+    <string name="font_smaller">-</string>
+    <string name="font_larger">+</string>
+    <string name="resize_handle">↘</string>
     <string name="open_settings">设置</string>
     <string name="status_idle">待机</string>
     <string name="status_connecting">正在连接</string>
     <string name="status_connected">已连接</string>
     <string name="status_stopped">已停止</string>
     <string name="status_disconnected">连接已断开</string>
+    <string name="status_restarting_session">正在重开上下文</string>
     <string name="caption_placeholder">等待字幕...</string>
     <string name="lang_badge_prefix">翻译到</string>
 
@@ -60,6 +67,8 @@
     <string name="echo_target">播放译文语音</string>
     <string name="font_size">字幕字号</string>
     <string name="bg_opacity">背景透明度</string>
+    <string name="caption_opacity">字幕透明度</string>
+    <string name="subtitle_max_lines">字幕最大行数</string>
     <string name="show_original">显示原文转写</string>
     <string name="system_prompt">系统提示词</string>
     <string name="save">保存</string>
@@ -76,4 +85,11 @@
     <string name="err_gemini">Gemini 错误：%1$s</string>
     <string name="err_proxy_host_required">启用代理时必须填写代理地址；使用 API Base URL 反代时请关闭代理。</string>
     <string name="err_proxy_port_invalid">代理端口必须是 1-65535 之间的数字。</string>
+    <string name="restart_requires_running">当前没有运行中的会话；点开始创建会话。</string>
+    <string name="session_log_title">会话记录</string>
+    <string name="session_log_note">这里保存原文转写和译文，可直接编辑、保存或复制。</string>
+    <string name="copy_log">复制</string>
+    <string name="close_log">关闭</string>
+    <string name="session_log_saved">记录已保存</string>
+    <string name="session_log_copied">记录已复制</string>
 </resources>
