@@ -163,16 +163,14 @@ class GeminiClient(
         val setup = JSONObject().apply {
             put("model", GEMINI_MODEL)
             put("generationConfig", JSONObject().apply {
-                put("responseModalities", JSONArray().apply { put(if (echo) "AUDIO" else "TEXT") })
+                put("responseModalities", JSONArray().apply { put("AUDIO") })
                 put("translationConfig", JSONObject().apply {
                     put("targetLanguageCode", targetLang)
                     put("echoTargetLanguage", echo)
                 })
             })
             put("inputAudioTranscription", JSONObject())
-            if (echo) {
-                put("outputAudioTranscription", JSONObject())
-            }
+            put("outputAudioTranscription", JSONObject())
             put("contextWindowCompression", JSONObject().apply {
                 put("triggerTokens", "0")
                 put("slidingWindow", JSONObject().apply { put("targetTokens", "0") })
@@ -190,14 +188,7 @@ class GeminiClient(
     }
 
     private fun buildSystemInstruction(): String {
-        val defaultInstruction = if (echo) {
-            ""
-        } else {
-            "Translate all incoming speech to target language code '$targetLang'. Return only the translated subtitle text."
-        }
-        return listOf(defaultInstruction, systemPrompt.trim())
-            .filter { it.isNotBlank() }
-            .joinToString("\n")
+        return systemPrompt.trim()
     }
 
     private fun handleText(raw: String) {

@@ -195,6 +195,7 @@ class CaptionOverlayView(
         if (outDraft.isNotEmpty()) {
             text = (text + "\n" + outDraft).trim('\n')
         }
+        text = latestLines(text, OUTPUT_VISIBLE_LINES)
         if (text.isEmpty()) text = context.getString(R.string.caption_placeholder)
         if (outputView.text.toString() != text) {
             outputView.text = text
@@ -206,10 +207,19 @@ class CaptionOverlayView(
         if (inDraft.isNotEmpty()) {
             text = (text + "\n" + inDraft).trim('\n')
         }
+        text = latestLines(text, INPUT_VISIBLE_LINES)
         if (inputView.text.toString() != text) {
             inputView.text = text
         }
     }
+
+    private fun latestLines(text: String, maxLines: Int): String =
+        text.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toList()
+            .takeLast(maxLines)
+            .joinToString("\n")
 
     private fun refreshStatus() {
         if (statusTextView.text.toString() != statusText) {
@@ -289,5 +299,10 @@ class CaptionOverlayView(
                 else -> false
             }
         }
+    }
+
+    companion object {
+        private const val OUTPUT_VISIBLE_LINES = 8
+        private const val INPUT_VISIBLE_LINES = 6
     }
 }
