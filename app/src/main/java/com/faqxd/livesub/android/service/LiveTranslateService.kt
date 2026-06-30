@@ -129,6 +129,16 @@ class LiveTranslateService : Service() {
             proxyPort = s.proxyPort,
         )
 
+        running = true
+        overlay?.setRunningState(true)
+        overlay?.setStatus(getString(R.string.status_connecting))
+        updateNotification(running = true)
+
+        if (!c.start()) {
+            cleanupAfterPipelineFailure()
+            return
+        }
+
         // Audio capture
         val cap = AudioCapture(
             onChunk = { pcm16 -> c.sendAudio(pcm16) },
@@ -143,16 +153,12 @@ class LiveTranslateService : Service() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "AudioCapture start failed", e)
-            notifyStatus(getString(R.string.err_capture, e.message ?: "unknown"))
-            player?.stop(); player = null
+            cleanupAfterPipelineFailure()
+            val error = getString(R.string.err_capture, e.message ?: "unknown")
+            overlay?.setStatus(error)
+            notifyStatus(error)
             return
         }
-
-        c.start()
-        running = true
-        overlay?.setRunningState(true)
-        overlay?.setStatus(getString(R.string.status_connecting))
-        updateNotification(running = true)
     }
 
     private fun stopPipeline() {
@@ -168,6 +174,20 @@ class LiveTranslateService : Service() {
         client = null
         overlay?.setRunningState(false)
         overlay?.setStatus(getString(R.string.status_stopped))
+        updateNotification(running = false)
+    }
+
+    private fun cleanupAfterPipelineFailure() {
+        running = false
+        try { capture?.stop() } catch (_: Exception) {}
+        capture = null
+        try { player?.stop() } catch (_: Exception) {}
+        player = null
+        try { mediaProjection?.stop() } catch (_: Exception) {}
+        mediaProjection = null
+        client?.stop()
+        client = null
+        overlay?.setRunningState(false)
         updateNotification(running = false)
     }
 
@@ -296,13 +316,19 @@ class LiveTranslateService : Service() {
         }
         override fun onDisconnected(reason: String) {
             scope.launch {
-                overlay?.setStatus("${getString(R.string.status_disconnected)}: $reason".take(80))
-                if (running) {
-                    running = false
-                    capture?.stop(); capture = null
-                    player?.stop(); player = null
-                    overlay?.setRunningState(false)
-                }
+                running = false
+                try { capture?.stop() } catch (_: Exception) {}
+                capture = null
+                try { player?.stop() } catch (_: Exception) {}
+                player = null
+                try { mediaProjection?.stop() } catch (_: Exception) {}
+                mediaProjection = null
+                client = null
+                overlay?.setRunningState(false)
+                overlay?.setStatus(
+                    "${getString(R.string.status_disconnected)}: ${reason.cleanDisconnectReason()}；点开始重试"
+                        .take(120)
+                )
                 updateNotification(running = false)
             }
         }
@@ -400,3 +426,9 @@ class LiveTranslateService : Service() {
             Intent(context, LiveTranslateService::class.java).setAction(ACTION_STOP)
     }
 }
+
+private fun String.cleanDisconnectReason(): String =
+    removePrefix("Error:")
+        .removePrefix("Closed:")
+        .trim()
+        .ifBlank { "unknown" }

@@ -44,6 +44,7 @@ class GeminiClient(
     private var proxyType: String = "HTTP"
     private var proxyHost: String = ""
     private var proxyPort: Int = 7890
+    private var clientConfigError: String? = null
     private var client: OkHttpClient = buildClient()
 
     fun configure(
@@ -73,22 +74,35 @@ class GeminiClient(
         this.client = buildClient()
     }
 
-    fun start() {
-        if (running) return
+    fun start(): Boolean {
+        if (running) return true
+        clientConfigError?.let { error ->
+            failBeforeConnect(error)
+            return false
+        }
         running = true
         ready = false
 
-        val request = Request.Builder().url(buildWsUrl()).build()
-        ws = client.newWebSocket(request, object : WebSocketListener() {
+        val request = try {
+            Request.Builder().url(buildWsUrl()).build()
+        } catch (e: Exception) {
+            failBeforeConnect("连接配置无效：${e.safeMessage()}")
+            return false
+        }
+
+        ws = try {
+            client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                listener.onStatus("Gemini socket opened")
+                listener.onStatus("已连接，正在初始化 Gemini")
                 if (!sendSetup(webSocket)) {
                     running = false
                     ready = false
+                    listener.onStatus("Gemini setup 发送失败；点开始重试")
+                    listener.onDisconnected("Gemini setup 发送失败")
                     webSocket.close(1000, "setup failed")
                     return
                 }
-                listener.onStatus("Waiting for Gemini setup")
+                listener.onStatus("等待 Gemini 初始化")
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -109,12 +123,18 @@ class GeminiClient(
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                val wasRunning = running
                 running = false
                 ready = false
                 ws = null
-                listener.onDisconnected("Closed: $reason")
+                if (wasRunning) listener.onDisconnected("Closed: $reason")
             }
         })
+        } catch (e: Exception) {
+            failBeforeConnect("连接启动失败：${e.safeMessage()}")
+            return false
+        }
+        return true
     }
 
     fun stop() {
@@ -142,16 +162,29 @@ class GeminiClient(
     }
 
     private fun buildClient(): OkHttpClient {
+        clientConfigError = null
         val builder = OkHttpClient.Builder()
             .readTimeout(0, TimeUnit.SECONDS)
 
-        if (proxyEnabled && proxyHost.isNotBlank() && proxyPort in 1..65535) {
+        if (proxyEnabled) {
+            if (proxyHost.isBlank()) {
+                clientConfigError = "代理已启用，但代理地址为空"
+                return builder.build()
+            }
+            if (proxyPort !in 1..65535) {
+                clientConfigError = "代理端口必须在 1-65535 之间"
+                return builder.build()
+            }
             val type = if (proxyType.equals("SOCKS", ignoreCase = true)) {
                 Proxy.Type.SOCKS
             } else {
                 Proxy.Type.HTTP
             }
-            builder.proxy(Proxy(type, InetSocketAddress(proxyHost, proxyPort)))
+            try {
+                builder.proxy(Proxy(type, InetSocketAddress(proxyHost, proxyPort)))
+            } catch (e: Exception) {
+                clientConfigError = "代理配置无效：${e.safeMessage()}"
+            }
         }
 
         return builder.build()
@@ -180,9 +213,6 @@ class GeminiClient(
             put("generationConfig", JSONObject().apply {
                 put("responseModalities", JSONArray().apply { put("AUDIO") })
                 put("translationConfig", JSONObject().apply {
-                    if (!sourceLang.equals("auto", ignoreCase = true)) {
-                        put("sourceLanguageCode", Languages.normalizeCode(sourceLang))
-                    }
                     put("targetLanguageCode", Languages.normalizeCode(targetLang))
                     put("echoTargetLanguage", true)
                 })
@@ -206,7 +236,21 @@ class GeminiClient(
     }
 
     private fun buildSystemInstruction(): String {
-        return systemPrompt.trim()
+        val prompt = systemPrompt.trim()
+        if (sourceLang.equals("auto", ignoreCase = true)) return prompt
+
+        val hint = "Source audio language hint: ${Languages.promptNameFor(sourceLang)}."
+        return listOf(hint, prompt)
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+    }
+
+    private fun failBeforeConnect(message: String) {
+        running = false
+        ready = false
+        ws = null
+        listener.onStatus("$message；改设置后点开始重试")
+        listener.onDisconnected(message)
     }
 
     private fun handleText(raw: String) {
@@ -274,3 +318,5 @@ class GeminiClient(
         private const val GEMINI_MODEL = "models/gemini-3.5-live-translate-preview"
     }
 }
+
+private fun Throwable.safeMessage(): String = message ?: javaClass.simpleName

@@ -8,6 +8,7 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.SeekBar
 import android.widget.Spinner
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.faqxd.livesub.android.data.AppSettings
 import com.faqxd.livesub.android.data.Languages
@@ -88,7 +89,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         saveBtn.setOnClickListener {
-            applyFromUi()
+            if (!applyFromUi()) return@setOnClickListener
             settings.save(this)
             setResult(RESULT_OK)
             finish()
@@ -159,13 +160,30 @@ class SettingsActivity : AppCompatActivity() {
         promptEdit.setText(settings.systemPrompt)
     }
 
-    private fun applyFromUi() {
+    private fun applyFromUi(): Boolean {
+        val proxyEnabled = proxyEnabledCheck.isChecked
+        val proxyHost = proxyHostEdit.text.toString().trim()
+        val proxyPortText = proxyPortEdit.text.toString().trim()
+        val proxyPort = proxyPortText.toIntOrNull()
+        if (proxyEnabled && proxyHost.isBlank()) {
+            val message = getString(R.string.err_proxy_host_required)
+            proxyHostEdit.error = message
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            return false
+        }
+        if (proxyEnabled && (proxyPort == null || proxyPort !in 1..65535)) {
+            val message = getString(R.string.err_proxy_port_invalid)
+            proxyPortEdit.error = message
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            return false
+        }
+
         settings.apiKey = apiKeyEdit.text.toString().trim()
         settings.apiBase = apiBaseEdit.text.toString().trim().ifBlank { AppSettings.DEFAULT_API_BASE }
-        settings.proxyEnabled = proxyEnabledCheck.isChecked
+        settings.proxyEnabled = proxyEnabled
         settings.proxyType = if (proxyTypeSpinner.selectedItemPosition == 1) "SOCKS" else "HTTP"
-        settings.proxyHost = proxyHostEdit.text.toString().trim()
-        settings.proxyPort = proxyPortEdit.text.toString().trim().toIntOrNull()?.coerceIn(1, 65535) ?: 7890
+        settings.proxyHost = proxyHost
+        settings.proxyPort = proxyPort?.coerceIn(1, 65535) ?: 7890
         val inputLangIdx = inputLangSpinner.selectedItemPosition
         if (inputLangIdx in Languages.INPUT_ALL.indices) {
             settings.sourceLanguage = Languages.INPUT_ALL[inputLangIdx].code
@@ -185,6 +203,7 @@ class SettingsActivity : AppCompatActivity() {
         settings.bgOpacity = opacitySlider.progress / 100f
         settings.showOriginal = showOriginalCheck.isChecked
         settings.systemPrompt = promptEdit.text.toString().trim()
+        return true
     }
 
     override fun onSupportNavigateUp(): Boolean {

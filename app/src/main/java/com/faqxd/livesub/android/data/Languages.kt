@@ -44,4 +44,25 @@ object Languages {
 
     fun inputNameFor(code: String): String =
         INPUT_ALL.firstOrNull { it.code == normalizeInputCode(code) }?.name ?: code.uppercase()
+
+    fun promptNameFor(code: String): String =
+        when (normalizeInputCode(code)) {
+            "en" -> "English (en)"
+            "es" -> "Spanish (es)"
+            "fr" -> "French (fr)"
+            "de" -> "German (de)"
+            "it" -> "Italian (it)"
+            "ja" -> "Japanese (ja)"
+            "ko" -> "Korean (ko)"
+            "zh-CN" -> "Simplified Chinese (zh-CN)"
+            "vi" -> "Vietnamese (vi)"
+            "pt" -> "Portuguese (pt)"
+            "ru" -> "Russian (ru)"
+            "hi" -> "Hindi (hi)"
+            "ar" -> "Arabic (ar)"
+            "th" -> "Thai (th)"
+            "id" -> "Indonesian (id)"
+            "tr" -> "Turkish (tr)"
+            else -> normalizeInputCode(code)
+        }
 }

@@ -191,8 +191,8 @@ class CaptionOverlayView(
         val s = statusText.lowercase()
         statusKind = when {
             listOf("connected", "已连接", "ready", "live").any { it in s } -> StatusKind.CONNECTED
-            listOf("connect", "正在连接", "starting", "loading", "init").any { it in s } -> StatusKind.CONNECTING
-            listOf("error", "fail", "disconnected", "stop", "错误", "失败", "断开", "停止").any { it in s } -> StatusKind.ERROR
+            listOf("connect", "正在连接", "starting", "loading", "init", "初始化", "等待").any { it in s } -> StatusKind.CONNECTING
+            listOf("error", "fail", "disconnected", "错误", "失败", "断开").any { it in s } -> StatusKind.ERROR
             else -> StatusKind.IDLE
         }
         refreshStatus()
@@ -211,7 +211,7 @@ class CaptionOverlayView(
     }
 
     fun setRunningState(running: Boolean) {
-        toggleBtn.text = if (running) context.getString(R.string.pause) else context.getString(R.string.start)
+        toggleBtn.text = if (running) context.getString(R.string.stop) else context.getString(R.string.start)
     }
 
     fun applyStyle() {
