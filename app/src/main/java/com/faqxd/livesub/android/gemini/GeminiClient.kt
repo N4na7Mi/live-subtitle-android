@@ -2,6 +2,7 @@ package com.faqxd.livesub.android.gemini
 
 import android.util.Base64
 import android.util.Log
+import com.faqxd.livesub.android.data.Languages
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -165,7 +166,7 @@ class GeminiClient(
             put("generationConfig", JSONObject().apply {
                 put("responseModalities", JSONArray().apply { put("AUDIO") })
                 put("translationConfig", JSONObject().apply {
-                    put("targetLanguageCode", targetLang)
+                    put("targetLanguageCode", Languages.normalizeCode(targetLang))
                     put("echoTargetLanguage", true)
                 })
             })

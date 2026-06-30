@@ -108,7 +108,8 @@ class SettingsActivity : AppCompatActivity() {
             this, android.R.layout.simple_spinner_dropdown_item,
             Languages.ALL.map { it.name }
         )
-        langSpinner.setSelection(Languages.ALL.indexOfFirst { it.code == settings.targetLanguage }.coerceAtLeast(0))
+        val selectedLanguage = Languages.normalizeCode(settings.targetLanguage)
+        langSpinner.setSelection(Languages.ALL.indexOfFirst { it.code == selectedLanguage }.coerceAtLeast(0))
 
         sourceSpinner.adapter = ArrayAdapter(
             this, android.R.layout.simple_spinner_dropdown_item,

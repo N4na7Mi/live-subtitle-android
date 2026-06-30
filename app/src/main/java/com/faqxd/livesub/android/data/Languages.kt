@@ -17,7 +17,7 @@ object Languages {
         TranslationLanguage("it", "意大利语"),
         TranslationLanguage("ja", "日语"),
         TranslationLanguage("ko", "韩语"),
-        TranslationLanguage("zh", "中文"),
+        TranslationLanguage("zh-CN", "中文（简体）"),
         TranslationLanguage("vi", "越南语"),
         TranslationLanguage("pt", "葡萄牙语"),
         TranslationLanguage("ru", "俄语"),
@@ -28,6 +28,9 @@ object Languages {
         TranslationLanguage("tr", "土耳其语"),
     )
 
+    fun normalizeCode(code: String): String =
+        if (code.equals("zh", ignoreCase = true)) "zh-CN" else code
+
     fun nameFor(code: String): String =
-        ALL.firstOrNull { it.code == code }?.name ?: code.uppercase()
+        ALL.firstOrNull { it.code == normalizeCode(code) }?.name ?: code.uppercase()
 }
