@@ -34,7 +34,7 @@ class GeminiClient(
 
     private var apiKey: String = ""
     private var apiBase: String = DEFAULT_API_BASE
-    private var targetLang: String = "zh"
+    private var targetLang: String = "zh-CN"
     private var systemPrompt: String = ""
     private var echo: Boolean = false
     private var proxyEnabled: Boolean = false
@@ -155,9 +155,16 @@ class GeminiClient(
         base = when {
             base.startsWith("https://") -> "wss://" + base.removePrefix("https://")
             base.startsWith("http://") -> "ws://" + base.removePrefix("http://")
+            base.startsWith("wss://") || base.startsWith("ws://") -> base
+            base.contains("://") -> base
+            base.isNotBlank() -> "wss://$base"
             else -> base
         }
-        return "$base$GEMINI_WS_PATH?key=$apiKey"
+        val hostAndPath = base.substringAfter("://", base)
+        val endpoint = if (hostAndPath.contains("/")) base else "$base$GEMINI_WS_PATH"
+        if (Regex("[?&]key=").containsMatchIn(endpoint)) return endpoint
+        val separator = if (endpoint.contains("?")) "&" else "?"
+        return "$endpoint${separator}key=$apiKey"
     }
 
     private fun sendSetup(socket: WebSocket): Boolean {

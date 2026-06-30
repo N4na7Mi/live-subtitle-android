@@ -31,6 +31,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var proxyPortEdit: EditText
     private lateinit var langSpinner: Spinner
     private lateinit var sourceSpinner: Spinner
+    private lateinit var audioChunkSpinner: Spinner
     private lateinit var volumeSlider: SeekBar
     private lateinit var echoCheck: CheckBox
     private lateinit var fontSlider: SeekBar
@@ -60,6 +61,7 @@ class SettingsActivity : AppCompatActivity() {
         proxyPortEdit = findViewById(R.id.proxyPortEdit)
         langSpinner = findViewById(R.id.langSpinner)
         sourceSpinner = findViewById(R.id.sourceSpinner)
+        audioChunkSpinner = findViewById(R.id.audioChunkSpinner)
         volumeSlider = findViewById(R.id.volumeSlider)
         echoCheck = findViewById(R.id.echoCheck)
         fontSlider = findViewById(R.id.fontSlider)
@@ -117,6 +119,15 @@ class SettingsActivity : AppCompatActivity() {
         )
         sourceSpinner.setSelection(if (settings.audioSource == "system") 1 else 0)
 
+        audioChunkSpinner.adapter = ArrayAdapter(
+            this, android.R.layout.simple_spinner_dropdown_item,
+            AppSettings.AUDIO_CHUNK_MS_OPTIONS.map { chunkLabel(it) }
+        )
+        val chunkSelection = AppSettings.AUDIO_CHUNK_MS_OPTIONS
+            .indexOf(AppSettings.normalizeAudioChunkMs(settings.audioChunkMs))
+            .coerceAtLeast(0)
+        audioChunkSpinner.setSelection(chunkSelection)
+
         volumeSlider.progress = (settings.playbackVolume * 100).toInt()
         echoCheck.isChecked = settings.echoTargetLanguage
         // Range 14..60, so shift by 14
@@ -138,6 +149,8 @@ class SettingsActivity : AppCompatActivity() {
             settings.targetLanguage = Languages.ALL[langIdx].code
         }
         settings.audioSource = if (sourceSpinner.selectedItemPosition == 1) "system" else "mic"
+        settings.audioChunkMs = AppSettings.AUDIO_CHUNK_MS_OPTIONS
+            .getOrElse(audioChunkSpinner.selectedItemPosition) { AppSettings.DEFAULT_AUDIO_CHUNK_MS }
         settings.playbackVolume = volumeSlider.progress / 100f
         settings.echoTargetLanguage = echoCheck.isChecked
         settings.fontSize = (fontSlider.progress + 14).coerceIn(14, 60)
@@ -149,5 +162,12 @@ class SettingsActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true
+    }
+
+    private fun chunkLabel(ms: Int): String = when (ms) {
+        100 -> "100 ms（低延迟）"
+        200 -> "200 ms（推荐）"
+        300 -> "300 ms（更稳）"
+        else -> "500 ms（高稳定，高延迟）"
     }
 }

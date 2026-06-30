@@ -12,6 +12,8 @@
     <string name="pause">暂停</string>
     <string name="stop">停止</string>
     <string name="close">关闭</string>
+    <string name="lock">锁定</string>
+    <string name="unlock">解锁</string>
     <string name="minimize">收起</string>
     <string name="expand">展开</string>
     <string name="clear">清空</string>
@@ -35,7 +37,7 @@
     <string name="api_key_label">Gemini API Key</string>
     <string name="api_key_hint">粘贴 Google Gemini API Key</string>
     <string name="api_base_label">API Base URL</string>
-    <string name="api_base_hint">API Base URL，默认使用 Google 官方地址</string>
+    <string name="api_base_hint">官方 Base URL、反代 Base URL，或完整 wss:// 地址</string>
     <string name="show_key">显示</string>
     <string name="hide_key">隐藏</string>
     <string name="proxy_enabled">启用代理</string>
@@ -44,10 +46,12 @@
     <string name="proxy_host_hint">例如 127.0.0.1</string>
     <string name="proxy_port">代理端口</string>
     <string name="proxy_port_hint">例如 7890 或 10808</string>
-    <string name="proxy_note">hy2 需要先由代理客户端转换成本机 HTTP/SOCKS 端口；如果使用 VPN 模式，一般不用在这里配置。</string>
+    <string name="proxy_note">不开手机代理时，可把 API Base URL 填成你自己的 Gemini Live HTTPS/WSS 反代地址；这里的代理只适合手机本机已有 HTTP/SOCKS 端口的情况。hy2 不能直接填，需要客户端先转换成本机端口。</string>
     <string name="audio_source">音频来源</string>
     <string name="audio_source_mic">麦克风</string>
     <string name="audio_source_system">系统声音</string>
+    <string name="audio_chunk_ms">音频切片长度</string>
+    <string name="audio_chunk_note">越短延迟越低但发送更频繁；200 ms 通常适合实时字幕，网络不稳时可选 300 或 500 ms。</string>
     <string name="translate_to">翻译目标语言</string>
     <string name="playback_volume">译文语音音量</string>
     <string name="echo_target">播放译文语音</string>

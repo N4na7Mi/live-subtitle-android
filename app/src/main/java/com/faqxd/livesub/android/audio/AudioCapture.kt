@@ -26,9 +26,11 @@ import java.nio.ByteOrder
  */
 class AudioCapture(
     private val onChunk: (ByteArray) -> Unit,
+    chunkMs: Int = DEFAULT_CHUNK_MS,
 ) {
     private val downsampler = PCM16Downsampler(targetRate = GEMINI_INPUT_RATE)
-    private val chunker = PCM16Chunker(chunkSize = CHUNK_SIZE, onChunk = onChunk)
+    private val chunkSize = chunkSizeForMs(chunkMs)
+    private val chunker = PCM16Chunker(chunkSize = chunkSize, onChunk = onChunk)
 
     private var record: AudioRecord? = null
     private var captureThread: Thread? = null
@@ -53,7 +55,7 @@ class AudioCapture(
             rate,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
-        ).coerceAtLeast(CHUNK_SIZE * 2)
+        ).coerceAtLeast(chunkSize * 2)
 
         val ar = AudioRecord(
             MediaRecorder.AudioSource.VOICE_RECOGNITION,
@@ -96,7 +98,7 @@ class AudioCapture(
             srcRate,
             if (srcChannels == 1) AudioFormat.CHANNEL_IN_MONO else AudioFormat.CHANNEL_IN_STEREO,
             AudioFormat.ENCODING_PCM_16BIT,
-        ).coerceAtLeast(CHUNK_SIZE * 2)
+        ).coerceAtLeast(chunkSize * 2)
         captureThread = Thread({ systemLoop(record, bufSize) }, "AudioCapture-sys").apply {
             isDaemon = true
             start()
@@ -116,8 +118,8 @@ class AudioCapture(
     // ---------- internals ----------
 
     private fun micLoop(ar: AudioRecord, bufSize: Int) {
-        // 16 kHz mono PCM16: each frame is 2 bytes. We read in chunks of
-        // ~CHUNK_SIZE bytes (250 ms) and forward directly — no resampling
+        // 16 kHz mono PCM16: each frame is 2 bytes. We read in chunks and
+        // forward directly — no resampling
         // needed because we requested the target rate.
         val buf = ByteArray(bufSize)
         while (running) {
@@ -170,6 +172,12 @@ class AudioCapture(
     companion object {
         private const val TAG = "AudioCapture"
         const val GEMINI_INPUT_RATE = 16000
-        const val CHUNK_SIZE = 8000  // bytes per Gemini send (~250 ms @16kHz mono int16)
+        const val DEFAULT_CHUNK_MS = 200
+
+        fun chunkSizeForMs(ms: Int): Int {
+            val safeMs = ms.coerceIn(80, 600)
+            val bytes = GEMINI_INPUT_RATE * 2 * safeMs / 1000
+            return if (bytes % 2 == 0) bytes else bytes + 1
+        }
     }
 }

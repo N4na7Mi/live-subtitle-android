@@ -3,6 +3,8 @@ package com.faqxd.livesub.android.service
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
@@ -35,13 +37,21 @@ class CaptionOverlayView(
     private var inDraft = ""
     private var statusText = ""
     private var statusKind: StatusKind = StatusKind.IDLE
+    private var outputRenderTarget = ""
+    private var inputRenderTarget = ""
+    private var outputAnimation: Runnable? = null
+    private var inputAnimation: Runnable? = null
 
     private enum class StatusKind { IDLE, CONNECTING, CONNECTED, ERROR }
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     private lateinit var rootView: View
+    private lateinit var headerRow: View
     private lateinit var statusDot: View
     private lateinit var statusTextView: TextView
     private lateinit var langBadge: TextView
+    private lateinit var lockBtn: Button
     private lateinit var minimizeBtn: Button
     private lateinit var outputView: TextView
     private lateinit var divider: View
@@ -59,15 +69,20 @@ class CaptionOverlayView(
     private var attached = false
     private var initialized = false
     private var collapsed = false
+    private var locked = false
+    private var chromeVisible = true
+    private var hideChromeRunnable: Runnable? = null
 
     val isAttached: Boolean get() = attached
 
     fun init() {
         if (initialized) return
         rootView = View.inflate(context, R.layout.overlay_caption, null)
+        headerRow = rootView.findViewById(R.id.overlayHeaderRow)
         statusDot = rootView.findViewById(R.id.overlayStatusDot)
         statusTextView = rootView.findViewById(R.id.overlayStatusText)
         langBadge = rootView.findViewById(R.id.overlayLangBadge)
+        lockBtn = rootView.findViewById(R.id.overlayLockBtn)
         minimizeBtn = rootView.findViewById(R.id.overlayMinimizeBtn)
         outputView = rootView.findViewById(R.id.overlayOutput)
         divider = rootView.findViewById(R.id.overlayDivider)
@@ -78,15 +93,33 @@ class CaptionOverlayView(
         closeBtn = rootView.findViewById(R.id.overlayCloseBtn)
         settingsBtn = rootView.findViewById(R.id.overlaySettingsBtn)
 
-        toggleBtn.setOnClickListener { callbacks.onToggleClicked() }
-        minimizeBtn.setOnClickListener { toggleCollapsed() }
-        clearBtn.setOnClickListener { callbacks.onClearClicked() }
+        toggleBtn.setOnClickListener {
+            showChromeTemporarily()
+            callbacks.onToggleClicked()
+        }
+        lockBtn.setOnClickListener {
+            toggleLocked()
+            showChromeTemporarily()
+        }
+        minimizeBtn.setOnClickListener {
+            toggleCollapsed()
+            showChromeTemporarily()
+        }
+        clearBtn.setOnClickListener {
+            showChromeTemporarily()
+            callbacks.onClearClicked()
+        }
         closeBtn.setOnClickListener { callbacks.onCloseClicked() }
-        settingsBtn.setOnClickListener { callbacks.onSettingsClicked() }
+        settingsBtn.setOnClickListener {
+            showChromeTemporarily()
+            callbacks.onSettingsClicked()
+        }
 
         installDragHandler()
         initialized = true
         applyStyle()
+        applyLockState()
+        showChromeTemporarily()
     }
 
     fun attach() {
@@ -106,6 +139,8 @@ class CaptionOverlayView(
             windowManager.removeView(rootView)
         } catch (_: Exception) {
         }
+        cancelTextAnimations()
+        cancelChromeTimer()
         attached = false
     }
 
@@ -168,6 +203,9 @@ class CaptionOverlayView(
         outDraft = ""
         inCommitted = ""
         inDraft = ""
+        outputRenderTarget = ""
+        inputRenderTarget = ""
+        cancelTextAnimations()
         refreshOutput()
         refreshInput()
     }
@@ -194,14 +232,63 @@ class CaptionOverlayView(
         applyCollapsedState()
     }
 
+    private fun toggleLocked() {
+        locked = !locked
+        applyLockState()
+    }
+
+    private fun applyLockState() {
+        if (!initialized) return
+        lockBtn.text = context.getString(if (locked) R.string.unlock else R.string.lock)
+    }
+
     private fun applyCollapsedState() {
         if (!initialized) return
         minimizeBtn.text = context.getString(if (collapsed) R.string.expand else R.string.minimize)
+        applyChromeState()
         outputView.visibility = if (collapsed) View.GONE else View.VISIBLE
-        controlsRow.visibility = if (collapsed) View.GONE else View.VISIBLE
         val showInput = !collapsed && settings.showOriginal
         divider.visibility = if (showInput) View.VISIBLE else View.GONE
         inputView.visibility = if (showInput) View.VISIBLE else View.GONE
+    }
+
+    private fun toggleChrome() {
+        if (chromeVisible) {
+            hideChromeNow()
+        } else {
+            showChromeTemporarily()
+        }
+    }
+
+    private fun showChromeTemporarily() {
+        chromeVisible = true
+        applyChromeState()
+        scheduleChromeAutoHide()
+    }
+
+    private fun hideChromeNow() {
+        if (collapsed) return
+        chromeVisible = false
+        cancelChromeTimer()
+        applyChromeState()
+    }
+
+    private fun applyChromeState() {
+        if (!initialized) return
+        headerRow.visibility = if (chromeVisible || collapsed) View.VISIBLE else View.GONE
+        controlsRow.visibility = if (chromeVisible && !collapsed) View.VISIBLE else View.GONE
+    }
+
+    private fun scheduleChromeAutoHide() {
+        cancelChromeTimer()
+        if (collapsed) return
+        hideChromeRunnable = Runnable { hideChromeNow() }
+        mainHandler.postDelayed(hideChromeRunnable!!, CHROME_AUTO_HIDE_MS)
+    }
+
+    private fun cancelChromeTimer() {
+        hideChromeRunnable?.let { mainHandler.removeCallbacks(it) }
+        hideChromeRunnable = null
     }
 
     private fun refreshOutput() {
@@ -211,9 +298,7 @@ class CaptionOverlayView(
         }
         text = latestLines(text, OUTPUT_VISIBLE_LINES)
         if (text.isEmpty()) text = context.getString(R.string.caption_placeholder)
-        if (outputView.text.toString() != text) {
-            outputView.text = text
-        }
+        setTextAnimated(outputView, text, isOutput = true)
     }
 
     private fun refreshInput() {
@@ -222,9 +307,63 @@ class CaptionOverlayView(
             text = (text + "\n" + inDraft).trim('\n')
         }
         text = latestLines(text, INPUT_VISIBLE_LINES)
-        if (inputView.text.toString() != text) {
-            inputView.text = text
+        setTextAnimated(inputView, text, isOutput = false)
+    }
+
+    private fun setTextAnimated(view: TextView, target: String, isOutput: Boolean) {
+        val currentTarget = if (isOutput) outputRenderTarget else inputRenderTarget
+        if (currentTarget == target) return
+
+        if (isOutput) {
+            outputRenderTarget = target
+            outputAnimation?.let { mainHandler.removeCallbacks(it) }
+            outputAnimation = null
+        } else {
+            inputRenderTarget = target
+            inputAnimation?.let { mainHandler.removeCallbacks(it) }
+            inputAnimation = null
         }
+
+        val current = view.text.toString()
+        val placeholder = context.getString(R.string.caption_placeholder)
+        val canAppend = current != placeholder &&
+            current.isNotEmpty() &&
+            target.startsWith(current) &&
+            target.length - current.length in 1..96
+
+        if (!canAppend) {
+            view.text = target
+            view.alpha = 0.82f
+            view.animate().alpha(1f).setDuration(140L).start()
+            return
+        }
+
+        var index = current.length
+        val step = object : Runnable {
+            override fun run() {
+                val latest = if (isOutput) outputRenderTarget else inputRenderTarget
+                if (!latest.startsWith(current)) {
+                    view.text = latest
+                    return
+                }
+
+                index = (index + if (isOutput) 3 else 4).coerceAtMost(latest.length)
+                view.text = latest.substring(0, index)
+                if (index < latest.length) {
+                    mainHandler.postDelayed(this, 18L)
+                }
+            }
+        }
+
+        if (isOutput) outputAnimation = step else inputAnimation = step
+        mainHandler.post(step)
+    }
+
+    private fun cancelTextAnimations() {
+        outputAnimation?.let { mainHandler.removeCallbacks(it) }
+        inputAnimation?.let { mainHandler.removeCallbacks(it) }
+        outputAnimation = null
+        inputAnimation = null
     }
 
     private fun latestLines(text: String, maxLines: Int): String =
@@ -264,9 +403,9 @@ class CaptionOverlayView(
                 WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = 40
-            y = 200
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            x = 0
+            y = 90
         }
     }
 
@@ -285,9 +424,10 @@ class CaptionOverlayView(
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
                     dragging = false
-                    false
+                    true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    if (locked) return@setOnTouchListener true
                     val dx = event.rawX - initialTouchX
                     val dy = event.rawY - initialTouchY
                     if (!dragging && (abs(dx) > 8 || abs(dy) > 8)) {
@@ -295,20 +435,19 @@ class CaptionOverlayView(
                     }
                     if (dragging) {
                         layoutParams.x = initialX + dx.toInt()
-                        layoutParams.y = initialY + dy.toInt()
+                        layoutParams.y = (initialY - dy.toInt()).coerceAtLeast(0)
                         try {
                             windowManager.updateViewLayout(rootView, layoutParams)
                         } catch (_: Exception) {
                         }
-                        true
-                    } else {
-                        false
                     }
+                    true
                 }
                 MotionEvent.ACTION_UP -> {
                     val wasDragging = dragging
                     dragging = false
-                    wasDragging
+                    if (!wasDragging) toggleChrome()
+                    true
                 }
                 else -> false
             }
@@ -318,5 +457,6 @@ class CaptionOverlayView(
     companion object {
         private const val OUTPUT_VISIBLE_LINES = 8
         private const val INPUT_VISIBLE_LINES = 6
+        private const val CHROME_AUTO_HIDE_MS = 4500L
     }
 }

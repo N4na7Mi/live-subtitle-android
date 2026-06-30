@@ -16,6 +16,7 @@
         android:paddingVertical="12dp">
 
         <LinearLayout
+            android:id="@+id/overlayHeaderRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
@@ -48,6 +49,18 @@
                 android:textColor="#FFFFFF"
                 android:textSize="10sp"
                 android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/overlayLockBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/overlay_btn_secondary"
+                android:minWidth="44dp"
+                android:paddingHorizontal="8dp"
+                android:text="@string/lock"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp" />
 
             <Button
                 android:id="@+id/overlayMinimizeBtn"

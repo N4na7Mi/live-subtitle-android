@@ -17,6 +17,7 @@ import androidx.core.content.edit
  *  - apiBase             — Override for the API base URL (proxy / regional mirror).
  *  - targetLanguage      — ISO-639-1 code, e.g. "zh", "es", "ja".
  *  - audioSource         — "mic" or "system" (loopback via MediaProjection).
+ *  - audioChunkMs        — PCM send chunk duration. Lower means lower latency.
  *  - fontSize            — Caption font size in sp.
  *  - bgOpacity           — 0..1 background alpha for the overlay card.
  *  - echoTargetLanguage  — Whether to play back the translated audio.
@@ -33,6 +34,7 @@ data class AppSettings(
     var proxyPort: Int = 7890,
     var targetLanguage: String = "zh-CN",
     var audioSource: String = "mic",
+    var audioChunkMs: Int = DEFAULT_AUDIO_CHUNK_MS,
     var fontSize: Int = 16,
     var bgOpacity: Float = 0.6f,
     var echoTargetLanguage: Boolean = false,
@@ -42,7 +44,16 @@ data class AppSettings(
 ) {
     companion object {
         const val DEFAULT_API_BASE = "https://generativelanguage.googleapis.com"
+        const val DEFAULT_AUDIO_CHUNK_MS = 200
+        val AUDIO_CHUNK_MS_OPTIONS = intArrayOf(100, 200, 300, 500)
         private const val PREFS_NAME = "livebuddy_settings"
+
+        fun normalizeAudioChunkMs(value: Int): Int = when {
+            value <= 150 -> 100
+            value <= 250 -> 200
+            value <= 400 -> 300
+            else -> 500
+        }
 
         fun load(context: Context): AppSettings {
             val prefs: SharedPreferences =
@@ -56,6 +67,9 @@ data class AppSettings(
                 proxyPort = prefs.getInt("proxy_port", 7890),
                 targetLanguage = Languages.normalizeCode(prefs.getString("target_language", "zh-CN") ?: "zh-CN"),
                 audioSource = prefs.getString("audio_source", "mic") ?: "mic",
+                audioChunkMs = normalizeAudioChunkMs(
+                    prefs.getInt("audio_chunk_ms", DEFAULT_AUDIO_CHUNK_MS)
+                ),
                 fontSize = prefs.getInt("font_size", 16),
                 bgOpacity = prefs.getFloat("bg_opacity", 0.6f),
                 echoTargetLanguage = prefs.getBoolean("echo_target", false),
@@ -77,6 +91,7 @@ data class AppSettings(
             putInt("proxy_port", proxyPort)
             putString("target_language", targetLanguage)
             putString("audio_source", audioSource)
+            putInt("audio_chunk_ms", normalizeAudioChunkMs(audioChunkMs))
             putInt("font_size", fontSize)
             putFloat("bg_opacity", bgOpacity)
             putBoolean("echo_target", echoTargetLanguage)

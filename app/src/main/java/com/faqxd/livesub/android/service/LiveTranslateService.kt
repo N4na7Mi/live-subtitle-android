@@ -128,7 +128,10 @@ class LiveTranslateService : Service() {
         )
 
         // Audio capture
-        val cap = AudioCapture(onChunk = { pcm16 -> c.sendAudio(pcm16) }).also { capture = it }
+        val cap = AudioCapture(
+            onChunk = { pcm16 -> c.sendAudio(pcm16) },
+            chunkMs = s.audioChunkMs,
+        ).also { capture = it }
         try {
             if (s.audioSource == "system" && resultData != null) {
                 startSystemCapture(cap, resultCode, resultData)
