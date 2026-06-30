@@ -2,6 +2,7 @@ package com.faqxd.livesub.android.gemini
 
 import android.util.Base64
 import android.util.Log
+import com.faqxd.livesub.android.audio.AudioCapture
 import com.faqxd.livesub.android.data.Languages
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -34,7 +35,9 @@ class GeminiClient(
 
     private var apiKey: String = ""
     private var apiBase: String = DEFAULT_API_BASE
+    private var sourceLang: String = "auto"
     private var targetLang: String = "zh-CN"
+    private var inputAudioRate: Int = AudioCapture.DEFAULT_INPUT_RATE
     private var systemPrompt: String = ""
     private var echo: Boolean = false
     private var proxyEnabled: Boolean = false
@@ -45,7 +48,9 @@ class GeminiClient(
 
     fun configure(
         apiKey: String,
+        sourceLang: String,
         targetLang: String,
+        inputAudioRate: Int,
         systemPrompt: String,
         echoTargetLanguage: Boolean,
         apiBase: String = DEFAULT_API_BASE,
@@ -56,7 +61,9 @@ class GeminiClient(
     ) {
         this.apiKey = apiKey.trim()
         this.apiBase = apiBase.ifBlank { DEFAULT_API_BASE }.trim()
+        this.sourceLang = Languages.normalizeInputCode(sourceLang)
         this.targetLang = targetLang
+        this.inputAudioRate = AudioCapture.normalizeInputRate(inputAudioRate)
         this.systemPrompt = systemPrompt
         this.echo = echoTargetLanguage
         this.proxyEnabled = proxyEnabled
@@ -127,7 +134,7 @@ class GeminiClient(
             put("realtimeInput", JSONObject().apply {
                 put("audio", JSONObject().apply {
                     put("data", b64)
-                    put("mimeType", "audio/pcm;rate=16000")
+                    put("mimeType", "audio/pcm;rate=$inputAudioRate")
                 })
             })
         }.toString()
@@ -173,6 +180,9 @@ class GeminiClient(
             put("generationConfig", JSONObject().apply {
                 put("responseModalities", JSONArray().apply { put("AUDIO") })
                 put("translationConfig", JSONObject().apply {
+                    if (!sourceLang.equals("auto", ignoreCase = true)) {
+                        put("sourceLanguageCode", Languages.normalizeCode(sourceLang))
+                    }
                     put("targetLanguageCode", Languages.normalizeCode(targetLang))
                     put("echoTargetLanguage", true)
                 })

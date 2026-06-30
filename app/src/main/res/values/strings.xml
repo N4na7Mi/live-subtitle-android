@@ -50,8 +50,11 @@
     <string name="audio_source">音频来源</string>
     <string name="audio_source_mic">麦克风</string>
     <string name="audio_source_system">系统声音</string>
+    <string name="input_language">输入语言</string>
+    <string name="input_language_note">默认自动识别；如果韩语被识别成日语，手动选择韩语。</string>
     <string name="audio_chunk_ms">音频切片长度</string>
-    <string name="audio_chunk_note">越短延迟越低但发送更频繁；200 ms 通常适合实时字幕，网络不稳时可选 300 或 500 ms。</string>
+    <string name="audio_chunk_note">切片越短延迟越低但发送更频繁；200 ms 通常适合实时字幕。发送采样率 16 kHz 最稳，24/48 kHz 会增加带宽且不一定提升识别。</string>
+    <string name="audio_sample_rate">发送采样率</string>
     <string name="translate_to">翻译目标语言</string>
     <string name="playback_volume">译文语音音量</string>
     <string name="echo_target">播放译文语音</string>

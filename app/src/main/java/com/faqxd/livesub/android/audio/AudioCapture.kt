@@ -11,8 +11,8 @@ import java.nio.ByteOrder
 /**
  * Port of `audio.py:AudioCapture`.
  *
- * Captures microphone audio at 16 kHz mono PCM16 — the exact format Gemini
- * Live expects — and forwards fixed-size chunks to [onChunk].
+ * Captures microphone audio as mono PCM16 and forwards fixed-size chunks to
+ * [onChunk]. The outgoing sample rate is configurable, defaulting to 16 kHz.
  *
  * Android 10+ can also capture **system / loopback audio** via
  * [MediaProjection.createVirtualDisplay] + [AudioPlaybackCaptureConfiguration],
@@ -27,9 +27,11 @@ import java.nio.ByteOrder
 class AudioCapture(
     private val onChunk: (ByteArray) -> Unit,
     chunkMs: Int = DEFAULT_CHUNK_MS,
+    targetRate: Int = DEFAULT_INPUT_RATE,
 ) {
-    private val downsampler = PCM16Downsampler(targetRate = GEMINI_INPUT_RATE)
-    private val chunkSize = chunkSizeForMs(chunkMs)
+    private val inputRate = normalizeInputRate(targetRate)
+    private val downsampler = PCM16Downsampler(targetRate = inputRate)
+    private val chunkSize = chunkSizeForMs(chunkMs, inputRate)
     private val chunker = PCM16Chunker(chunkSize = chunkSize, onChunk = onChunk)
 
     private var record: AudioRecord? = null
@@ -40,7 +42,7 @@ class AudioCapture(
     private var channels = 1
 
     /**
-     * Start microphone capture at 16 kHz mono.
+     * Start microphone capture at the configured outgoing sample rate.
      *
      * Requires `RECORD_AUDIO` permission. The calling service MUST hold a
      * foreground service of type `microphone` (Android 14+).
@@ -49,8 +51,8 @@ class AudioCapture(
     fun startMicrophone() {
         if (running) return
 
-        // Prefer 16 kHz mono natively so no resampling is required.
-        val rate = GEMINI_INPUT_RATE
+        // Prefer the outgoing rate natively so no resampling is required.
+        val rate = inputRate
         val minBuf = AudioRecord.getMinBufferSize(
             rate,
             AudioFormat.CHANNEL_IN_MONO,
@@ -118,7 +120,7 @@ class AudioCapture(
     // ---------- internals ----------
 
     private fun micLoop(ar: AudioRecord, bufSize: Int) {
-        // 16 kHz mono PCM16: each frame is 2 bytes. We read in chunks and
+        // Mono PCM16: each frame is 2 bytes. We read in chunks and
         // forward directly — no resampling
         // needed because we requested the target rate.
         val buf = ByteArray(bufSize)
@@ -171,12 +173,26 @@ class AudioCapture(
 
     companion object {
         private const val TAG = "AudioCapture"
-        const val GEMINI_INPUT_RATE = 16000
+        const val DEFAULT_INPUT_RATE = 16000
         const val DEFAULT_CHUNK_MS = 200
+        private val INPUT_RATE_OPTIONS = intArrayOf(16000, 24000, 48000)
 
-        fun chunkSizeForMs(ms: Int): Int {
+        fun normalizeInputRate(rate: Int): Int {
+            var best = DEFAULT_INPUT_RATE
+            var bestDistance = Int.MAX_VALUE
+            for (option in INPUT_RATE_OPTIONS) {
+                val distance = kotlin.math.abs(option - rate)
+                if (distance < bestDistance) {
+                    best = option
+                    bestDistance = distance
+                }
+            }
+            return best
+        }
+
+        fun chunkSizeForMs(ms: Int, sampleRate: Int = DEFAULT_INPUT_RATE): Int {
             val safeMs = ms.coerceIn(80, 600)
-            val bytes = GEMINI_INPUT_RATE * 2 * safeMs / 1000
+            val bytes = normalizeInputRate(sampleRate) * 2 * safeMs / 1000
             return if (bytes % 2 == 0) bytes else bytes + 1
         }
     }

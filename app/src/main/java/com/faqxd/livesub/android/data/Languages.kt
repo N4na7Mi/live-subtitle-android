@@ -28,9 +28,20 @@ object Languages {
         TranslationLanguage("tr", "土耳其语"),
     )
 
+    val INPUT_ALL: List<TranslationLanguage> =
+        listOf(TranslationLanguage("auto", "自动识别")) + ALL
+
     fun normalizeCode(code: String): String =
         if (code.equals("zh", ignoreCase = true)) "zh-CN" else code
 
+    fun normalizeInputCode(code: String): String {
+        val normalized = normalizeCode(code)
+        return if (normalized.isBlank()) "auto" else normalized
+    }
+
     fun nameFor(code: String): String =
         ALL.firstOrNull { it.code == normalizeCode(code) }?.name ?: code.uppercase()
+
+    fun inputNameFor(code: String): String =
+        INPUT_ALL.firstOrNull { it.code == normalizeInputCode(code) }?.name ?: code.uppercase()
 }

@@ -29,9 +29,11 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var proxyTypeSpinner: Spinner
     private lateinit var proxyHostEdit: EditText
     private lateinit var proxyPortEdit: EditText
+    private lateinit var inputLangSpinner: Spinner
     private lateinit var langSpinner: Spinner
     private lateinit var sourceSpinner: Spinner
     private lateinit var audioChunkSpinner: Spinner
+    private lateinit var audioSampleRateSpinner: Spinner
     private lateinit var volumeSlider: SeekBar
     private lateinit var echoCheck: CheckBox
     private lateinit var fontSlider: SeekBar
@@ -59,9 +61,11 @@ class SettingsActivity : AppCompatActivity() {
         proxyTypeSpinner = findViewById(R.id.proxyTypeSpinner)
         proxyHostEdit = findViewById(R.id.proxyHostEdit)
         proxyPortEdit = findViewById(R.id.proxyPortEdit)
+        inputLangSpinner = findViewById(R.id.inputLangSpinner)
         langSpinner = findViewById(R.id.langSpinner)
         sourceSpinner = findViewById(R.id.sourceSpinner)
         audioChunkSpinner = findViewById(R.id.audioChunkSpinner)
+        audioSampleRateSpinner = findViewById(R.id.audioSampleRateSpinner)
         volumeSlider = findViewById(R.id.volumeSlider)
         echoCheck = findViewById(R.id.echoCheck)
         fontSlider = findViewById(R.id.fontSlider)
@@ -106,6 +110,15 @@ class SettingsActivity : AppCompatActivity() {
         )
         proxyTypeSpinner.setSelection(if (settings.proxyType.equals("SOCKS", ignoreCase = true)) 1 else 0)
 
+        inputLangSpinner.adapter = ArrayAdapter(
+            this, android.R.layout.simple_spinner_dropdown_item,
+            Languages.INPUT_ALL.map { it.name }
+        )
+        val selectedInputLanguage = Languages.normalizeInputCode(settings.sourceLanguage)
+        inputLangSpinner.setSelection(
+            Languages.INPUT_ALL.indexOfFirst { it.code == selectedInputLanguage }.coerceAtLeast(0)
+        )
+
         langSpinner.adapter = ArrayAdapter(
             this, android.R.layout.simple_spinner_dropdown_item,
             Languages.ALL.map { it.name }
@@ -128,6 +141,15 @@ class SettingsActivity : AppCompatActivity() {
             .coerceAtLeast(0)
         audioChunkSpinner.setSelection(chunkSelection)
 
+        audioSampleRateSpinner.adapter = ArrayAdapter(
+            this, android.R.layout.simple_spinner_dropdown_item,
+            AppSettings.AUDIO_SAMPLE_RATE_OPTIONS.map { sampleRateLabel(it) }
+        )
+        val sampleRateSelection = AppSettings.AUDIO_SAMPLE_RATE_OPTIONS
+            .indexOf(AppSettings.normalizeAudioSampleRate(settings.audioSampleRate))
+            .coerceAtLeast(0)
+        audioSampleRateSpinner.setSelection(sampleRateSelection)
+
         volumeSlider.progress = (settings.playbackVolume * 100).toInt()
         echoCheck.isChecked = settings.echoTargetLanguage
         // Range 14..60, so shift by 14
@@ -144,6 +166,10 @@ class SettingsActivity : AppCompatActivity() {
         settings.proxyType = if (proxyTypeSpinner.selectedItemPosition == 1) "SOCKS" else "HTTP"
         settings.proxyHost = proxyHostEdit.text.toString().trim()
         settings.proxyPort = proxyPortEdit.text.toString().trim().toIntOrNull()?.coerceIn(1, 65535) ?: 7890
+        val inputLangIdx = inputLangSpinner.selectedItemPosition
+        if (inputLangIdx in Languages.INPUT_ALL.indices) {
+            settings.sourceLanguage = Languages.INPUT_ALL[inputLangIdx].code
+        }
         val langIdx = langSpinner.selectedItemPosition
         if (langIdx in Languages.ALL.indices) {
             settings.targetLanguage = Languages.ALL[langIdx].code
@@ -151,6 +177,8 @@ class SettingsActivity : AppCompatActivity() {
         settings.audioSource = if (sourceSpinner.selectedItemPosition == 1) "system" else "mic"
         settings.audioChunkMs = AppSettings.AUDIO_CHUNK_MS_OPTIONS
             .getOrElse(audioChunkSpinner.selectedItemPosition) { AppSettings.DEFAULT_AUDIO_CHUNK_MS }
+        settings.audioSampleRate = AppSettings.AUDIO_SAMPLE_RATE_OPTIONS
+            .getOrElse(audioSampleRateSpinner.selectedItemPosition) { AppSettings.DEFAULT_AUDIO_SAMPLE_RATE }
         settings.playbackVolume = volumeSlider.progress / 100f
         settings.echoTargetLanguage = echoCheck.isChecked
         settings.fontSize = (fontSlider.progress + 14).coerceIn(14, 60)
@@ -169,5 +197,11 @@ class SettingsActivity : AppCompatActivity() {
         200 -> "200 ms（推荐）"
         300 -> "300 ms（更稳）"
         else -> "500 ms（高稳定，高延迟）"
+    }
+
+    private fun sampleRateLabel(rate: Int): String = when (rate) {
+        16000 -> "16 kHz（推荐）"
+        24000 -> "24 kHz"
+        else -> "48 kHz（高带宽）"
     }
 }

@@ -117,7 +117,9 @@ class LiveTranslateService : Service() {
         val c = GeminiClient(listener = createClientListener()).also { client = it }
         c.configure(
             apiKey = s.apiKey,
+            sourceLang = s.sourceLanguage,
             targetLang = s.targetLanguage,
+            inputAudioRate = s.audioSampleRate,
             systemPrompt = s.systemPrompt,
             echoTargetLanguage = s.echoTargetLanguage,
             apiBase = s.apiBase,
@@ -131,6 +133,7 @@ class LiveTranslateService : Service() {
         val cap = AudioCapture(
             onChunk = { pcm16 -> c.sendAudio(pcm16) },
             chunkMs = s.audioChunkMs,
+            targetRate = s.audioSampleRate,
         ).also { capture = it }
         try {
             if (s.audioSource == "system" && resultData != null) {

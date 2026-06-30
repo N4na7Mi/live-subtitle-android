@@ -15,9 +15,11 @@ import androidx.core.content.edit
  *  - apiKey              — Google Gemini API key (stored plaintext, like the
  *                          Windows version; users on rooted devices can read it).
  *  - apiBase             — Override for the API base URL (proxy / regional mirror).
+ *  - sourceLanguage      — Source language hint, or "auto".
  *  - targetLanguage      — ISO-639-1 code, e.g. "zh", "es", "ja".
  *  - audioSource         — "mic" or "system" (loopback via MediaProjection).
  *  - audioChunkMs        — PCM send chunk duration. Lower means lower latency.
+ *  - audioSampleRate     — PCM sample rate sent to Gemini.
  *  - fontSize            — Caption font size in sp.
  *  - bgOpacity           — 0..1 background alpha for the overlay card.
  *  - echoTargetLanguage  — Whether to play back the translated audio.
@@ -32,9 +34,11 @@ data class AppSettings(
     var proxyType: String = "HTTP",
     var proxyHost: String = "",
     var proxyPort: Int = 7890,
+    var sourceLanguage: String = "auto",
     var targetLanguage: String = "zh-CN",
     var audioSource: String = "mic",
     var audioChunkMs: Int = DEFAULT_AUDIO_CHUNK_MS,
+    var audioSampleRate: Int = DEFAULT_AUDIO_SAMPLE_RATE,
     var fontSize: Int = 16,
     var bgOpacity: Float = 0.6f,
     var echoTargetLanguage: Boolean = false,
@@ -45,7 +49,9 @@ data class AppSettings(
     companion object {
         const val DEFAULT_API_BASE = "https://generativelanguage.googleapis.com"
         const val DEFAULT_AUDIO_CHUNK_MS = 200
+        const val DEFAULT_AUDIO_SAMPLE_RATE = 16000
         val AUDIO_CHUNK_MS_OPTIONS = intArrayOf(100, 200, 300, 500)
+        val AUDIO_SAMPLE_RATE_OPTIONS = intArrayOf(16000, 24000, 48000)
         private const val PREFS_NAME = "livebuddy_settings"
 
         fun normalizeAudioChunkMs(value: Int): Int = when {
@@ -53,6 +59,19 @@ data class AppSettings(
             value <= 250 -> 200
             value <= 400 -> 300
             else -> 500
+        }
+
+        fun normalizeAudioSampleRate(value: Int): Int {
+            var best = DEFAULT_AUDIO_SAMPLE_RATE
+            var bestDistance = Int.MAX_VALUE
+            for (option in AUDIO_SAMPLE_RATE_OPTIONS) {
+                val distance = kotlin.math.abs(option - value)
+                if (distance < bestDistance) {
+                    best = option
+                    bestDistance = distance
+                }
+            }
+            return best
         }
 
         fun load(context: Context): AppSettings {
@@ -65,10 +84,16 @@ data class AppSettings(
                 proxyType = prefs.getString("proxy_type", "HTTP") ?: "HTTP",
                 proxyHost = prefs.getString("proxy_host", "") ?: "",
                 proxyPort = prefs.getInt("proxy_port", 7890),
+                sourceLanguage = Languages.normalizeInputCode(
+                    prefs.getString("source_language", "auto") ?: "auto"
+                ),
                 targetLanguage = Languages.normalizeCode(prefs.getString("target_language", "zh-CN") ?: "zh-CN"),
                 audioSource = prefs.getString("audio_source", "mic") ?: "mic",
                 audioChunkMs = normalizeAudioChunkMs(
                     prefs.getInt("audio_chunk_ms", DEFAULT_AUDIO_CHUNK_MS)
+                ),
+                audioSampleRate = normalizeAudioSampleRate(
+                    prefs.getInt("audio_sample_rate", DEFAULT_AUDIO_SAMPLE_RATE)
                 ),
                 fontSize = prefs.getInt("font_size", 16),
                 bgOpacity = prefs.getFloat("bg_opacity", 0.6f),
@@ -89,9 +114,11 @@ data class AppSettings(
             putString("proxy_type", proxyType)
             putString("proxy_host", proxyHost)
             putInt("proxy_port", proxyPort)
+            putString("source_language", Languages.normalizeInputCode(sourceLanguage))
             putString("target_language", targetLanguage)
             putString("audio_source", audioSource)
             putInt("audio_chunk_ms", normalizeAudioChunkMs(audioChunkMs))
+            putInt("audio_sample_rate", normalizeAudioSampleRate(audioSampleRate))
             putInt("font_size", fontSize)
             putFloat("bg_opacity", bgOpacity)
             putBoolean("echo_target", echoTargetLanguage)
