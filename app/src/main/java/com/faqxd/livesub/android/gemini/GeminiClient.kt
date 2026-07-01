@@ -93,7 +93,7 @@ class GeminiClient(
         ws = try {
             client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                listener.onStatus("已连接，正在初始化 Gemini")
+                listener.onStatus("已连接 ${request.url.host}，正在初始化 Gemini")
                 if (!sendSetup(webSocket)) {
                     running = false
                     ready = false
@@ -118,8 +118,9 @@ class GeminiClient(
                 running = false
                 ready = false
                 ws = null
-                listener.onStatus("Gemini error: ${t.message ?: "unknown"}")
-                listener.onDisconnected("Error: ${t.message ?: "unknown"}")
+                val message = "连接失败（${request.connectionLabel()}）：${t.message ?: "unknown"}"
+                listener.onStatus(message)
+                listener.onDisconnected(message)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -175,6 +176,10 @@ class GeminiClient(
                 clientConfigError = "代理端口必须在 1-65535 之间"
                 return builder.build()
             }
+            if (isLoopbackHost(proxyHost) && proxyPort in setOf(80, 443)) {
+                clientConfigError = "代理地址像是填错了：$proxyHost:$proxyPort；使用反代时请关闭代理"
+                return builder.build()
+            }
             val type = if (proxyType.equals("SOCKS", ignoreCase = true)) {
                 Proxy.Type.SOCKS
             } else {
@@ -185,6 +190,8 @@ class GeminiClient(
             } catch (e: Exception) {
                 clientConfigError = "代理配置无效：${e.safeMessage()}"
             }
+        } else {
+            builder.proxy(Proxy.NO_PROXY)
         }
 
         return builder.build()
@@ -320,3 +327,15 @@ class GeminiClient(
 }
 
 private fun Throwable.safeMessage(): String = message ?: javaClass.simpleName
+
+private fun Request.connectionLabel(): String =
+    "目标 ${url.host}，${url.scheme}"
+
+private fun isLoopbackHost(host: String): Boolean {
+    val h = host.trim().removePrefix("[").removeSuffix("]")
+    return h.equals("localhost", ignoreCase = true) ||
+        h == "::1" ||
+        h == "0:0:0:0:0:0:0:1" ||
+        h == "127.0.0.1" ||
+        h.startsWith("127.")
+}
