@@ -18,6 +18,29 @@ object SessionLogStore {
     fun load(context: Context): String =
         prefs(context).getString(KEY_TEXT, "") ?: ""
 
+    fun loadLastInput(context: Context): String =
+        prefs(context).getString(KEY_LAST_INPUT, "") ?: ""
+
+    fun loadLastOutput(context: Context): String =
+        prefs(context).getString(KEY_LAST_OUTPUT, "") ?: ""
+
+    fun registerListener(
+        context: Context,
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) {
+        prefs(context).registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterListener(
+        context: Context,
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) {
+        prefs(context).unregisterOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun isLiveTranscriptKey(key: String?): Boolean =
+        key == KEY_LAST_INPUT || key == KEY_LAST_OUTPUT
+
     fun save(context: Context, text: String) {
         prefs(context).edit {
             putString(KEY_TEXT, text.takeLast(MAX_CHARS))

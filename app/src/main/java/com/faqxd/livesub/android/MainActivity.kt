@@ -3,6 +3,7 @@ package com.faqxd.livesub.android
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
@@ -16,6 +17,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.faqxd.livesub.android.data.AppSettings
+import com.faqxd.livesub.android.data.SessionLogStore
 import com.faqxd.livesub.android.service.LiveTranslateService
 
 class MainActivity : AppCompatActivity() {
@@ -33,6 +35,11 @@ class MainActivity : AppCompatActivity() {
 
     private var pendingStart = false
     private var serviceRunning = false
+    private val sessionLogListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (SessionLogStore.isLiveTranscriptKey(key)) {
+            runOnUiThread { refreshTranscriptPreview() }
+        }
+    }
 
     private val micPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -97,16 +104,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        SessionLogStore.registerListener(this, sessionLogListener)
         settings = AppSettings.load(this)
         serviceRunning = LiveTranslateService.isActive
         applySettingsToUi()
+    }
+
+    override fun onPause() {
+        SessionLogStore.unregisterListener(this, sessionLogListener)
+        super.onPause()
     }
 
     private fun applySettingsToUi() {
         statusText.text = getString(R.string.status_idle)
         langBadge.visibility = View.GONE
         inputView.visibility = View.GONE
-        outputView.text = getString(R.string.caption_placeholder)
+        refreshTranscriptPreview()
         toggleBtn.text = getString(if (serviceRunning) R.string.stop else R.string.start)
         if (serviceRunning) {
             hintText.text = getString(R.string.main_hint_running)
@@ -114,6 +127,11 @@ class MainActivity : AppCompatActivity() {
         if (settings.apiKey.isBlank()) {
             showHint(getString(R.string.err_no_api_key))
         }
+    }
+
+    private fun refreshTranscriptPreview() {
+        val output = SessionLogStore.loadLastOutput(this)
+        outputView.text = output.ifBlank { getString(R.string.caption_placeholder) }
     }
 
     private fun onToggleClicked() {
