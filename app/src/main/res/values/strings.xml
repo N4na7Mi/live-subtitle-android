@@ -53,7 +53,7 @@
     <string name="api_base_hint">官方 Base URL、反代 Base URL，或完整 wss:// 地址</string>
     <string name="api_host_override_label">DNS 直连 IP（可选）</string>
     <string name="api_host_override_hint">手机 DNS 解析错时填写服务器 IP</string>
-    <string name="api_host_override_note">只有看到域名解析到 127.0.0.1 等错误地址时才需要填；API Base URL 仍然填写反代域名，代理保持关闭。</string>
+    <string name="api_host_override_note">系统 DNS 解析到 127.0.0.1 等本机地址时，App 会先尝试公共 DNS 兜底；仍失败再填写服务器公网 IP。API Base URL 仍然填写反代域名，代理保持关闭。</string>
     <string name="show_key">显示</string>
     <string name="hide_key">隐藏</string>
     <string name="proxy_enabled">启用代理</string>

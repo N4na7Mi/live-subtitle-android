@@ -13,6 +13,9 @@ import okhttp3.WebSocketListener
 import okio.ByteString
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.IDN
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -194,10 +197,18 @@ class GeminiClient(
                 }
                 if (shouldInspect && addresses.any { it.isLoopbackAddress }) {
                     val resolved = addresses.joinToString(",") { it.hostAddress ?: it.toString() }
-                    val mode = if (overrideHost.isBlank()) "未填写" else overrideHost
-                    throw UnknownHostException(
-                        "DNS 将 $hostname 解析到本机地址 $resolved；DNS直连IP=$mode"
-                    )
+                    if (overrideHost.isBlank()) {
+                        val fallback = PublicDns.lookup(hostname)
+                            .filterNot { it.isLoopbackAddress }
+                        if (fallback.isNotEmpty()) return fallback
+                        throw UnknownHostException(
+                            "系统 DNS 将 $hostname 解析到本机地址 $resolved；公共DNS兜底失败。可填写DNS直连IP或关闭手机DNS/VPN拦截"
+                        )
+                    } else {
+                        throw UnknownHostException(
+                            "DNS直连IP/Host $overrideHost 解析到本机地址 $resolved；请填写服务器公网IP"
+                        )
+                    }
                 }
                 return addresses
             }
@@ -306,7 +317,7 @@ class GeminiClient(
 
     private fun connectionSummary(request: Request): String {
         val dns = if (apiHostOverride.isBlank()) {
-            "系统DNS"
+            "系统DNS/公共DNS兜底"
         } else {
             "直连IP $apiHostOverride"
         }
@@ -401,4 +412,128 @@ private fun isLoopbackHost(host: String): Boolean {
         h == "0:0:0:0:0:0:0:1" ||
         h == "127.0.0.1" ||
         h.startsWith("127.")
+}
+
+private object PublicDns {
+    private const val DNS_PORT = 53
+    private const val TIMEOUT_MS = 1200
+    private val SERVERS = listOf("1.1.1.1", "8.8.8.8")
+    private val QUERY_TYPES = intArrayOf(1, 28) // A, AAAA
+
+    fun lookup(hostname: String): List<InetAddress> {
+        val host = try {
+            IDN.toASCII(hostname.trim().trimEnd('.'))
+        } catch (_: Exception) {
+            return emptyList()
+        }
+        if (host.isBlank()) return emptyList()
+
+        val out = linkedMapOf<String, InetAddress>()
+        for (server in SERVERS) {
+            for (type in QUERY_TYPES) {
+                query(server, host, type).forEach { address ->
+                    val key = address.hostAddress ?: address.toString()
+                    out[key] = address
+                }
+                if (out.isNotEmpty()) return out.values.toList()
+            }
+        }
+        return out.values.toList()
+    }
+
+    private fun query(server: String, host: String, qtype: Int): List<InetAddress> {
+        val id = (System.nanoTime() and 0xffffL).toInt()
+        val request = buildQuery(host, qtype, id)
+        return try {
+            DatagramSocket().use { socket ->
+                socket.soTimeout = TIMEOUT_MS
+                val packet = DatagramPacket(
+                    request,
+                    request.size,
+                    InetAddress.getByName(server),
+                    DNS_PORT
+                )
+                socket.send(packet)
+
+                val buffer = ByteArray(512)
+                val response = DatagramPacket(buffer, buffer.size)
+                socket.receive(response)
+                parseResponse(buffer.copyOf(response.length), id, host)
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun buildQuery(host: String, qtype: Int, id: Int): ByteArray {
+        val out = ArrayList<Byte>()
+        fun write16(value: Int) {
+            out.add(((value ushr 8) and 0xff).toByte())
+            out.add((value and 0xff).toByte())
+        }
+
+        write16(id)
+        write16(0x0100) // standard recursive query
+        write16(1)
+        write16(0)
+        write16(0)
+        write16(0)
+        host.split('.').forEach { label ->
+            val bytes = label.encodeToByteArray()
+            if (bytes.isEmpty() || bytes.size > 63) return@forEach
+            out.add(bytes.size.toByte())
+            bytes.forEach { out.add(it) }
+        }
+        out.add(0)
+        write16(qtype)
+        write16(1) // IN
+        return out.toByteArray()
+    }
+
+    private fun parseResponse(data: ByteArray, expectedId: Int, host: String): List<InetAddress> {
+        if (data.size < 12) return emptyList()
+        val id = read16(data, 0)
+        val flags = read16(data, 2)
+        if (id != expectedId || (flags and 0x000f) != 0) return emptyList()
+
+        val questionCount = read16(data, 4)
+        val answerCount = read16(data, 6)
+        var offset = 12
+        repeat(questionCount) {
+            offset = skipName(data, offset)
+            offset += 4
+            if (offset > data.size) return emptyList()
+        }
+
+        val addresses = mutableListOf<InetAddress>()
+        repeat(answerCount) {
+            offset = skipName(data, offset)
+            if (offset + 10 > data.size) return@repeat
+            val type = read16(data, offset)
+            val klass = read16(data, offset + 2)
+            val len = read16(data, offset + 8)
+            offset += 10
+            if (offset + len > data.size) return@repeat
+            if (klass == 1 && ((type == 1 && len == 4) || (type == 28 && len == 16))) {
+                addresses += InetAddress.getByAddress(host, data.copyOfRange(offset, offset + len))
+            }
+            offset += len
+        }
+        return addresses
+    }
+
+    private fun skipName(data: ByteArray, start: Int): Int {
+        var offset = start
+        var guard = 0
+        while (offset < data.size && guard++ < 128) {
+            val len = data[offset].toInt() and 0xff
+            if (len == 0) return offset + 1
+            if ((len and 0xc0) == 0xc0) return offset + 2
+            offset += len + 1
+        }
+        return data.size + 1
+    }
+
+    private fun read16(data: ByteArray, offset: Int): Int =
+        ((data[offset].toInt() and 0xff) shl 8) or (data[offset + 1].toInt() and 0xff)
 }
