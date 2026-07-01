@@ -28,6 +28,7 @@ class CaptionOverlayView(
         fun onToggleClicked()
         fun onRestartClicked()
         fun onLogClicked()
+        fun onAudioSourceClicked()
         fun onCloseClicked()
         fun onSettingsClicked()
     }
@@ -68,6 +69,7 @@ class CaptionOverlayView(
     private lateinit var settingsBtn: ImageButton
     private lateinit var fontMinusBtn: Button
     private lateinit var fontPlusBtn: Button
+    private lateinit var sourceBtn: Button
     private lateinit var resizeHandle: TextView
 
     private val windowManager: WindowManager =
@@ -106,6 +108,7 @@ class CaptionOverlayView(
         settingsBtn = rootView.findViewById(R.id.overlaySettingsBtn)
         fontMinusBtn = rootView.findViewById(R.id.overlayFontMinusBtn)
         fontPlusBtn = rootView.findViewById(R.id.overlayFontPlusBtn)
+        sourceBtn = rootView.findViewById(R.id.overlaySourceBtn)
         resizeHandle = rootView.findViewById(R.id.overlayResizeHandle)
 
         toggleBtn.setOnClickListener {
@@ -140,6 +143,10 @@ class CaptionOverlayView(
         fontPlusBtn.setOnClickListener {
             adjustFontSize(2)
             showChromeTemporarily()
+        }
+        sourceBtn.setOnClickListener {
+            showChromeTemporarily()
+            callbacks.onAudioSourceClicked()
         }
 
         installDragHandler()
@@ -254,9 +261,15 @@ class CaptionOverlayView(
         langBadge.visibility = View.GONE
         divider.visibility = View.GONE
         inputView.visibility = View.GONE
+        refreshSourceButton()
         applyCollapsedState()
         refreshStatus()
         refreshOutput()
+    }
+
+    fun setAudioSource(source: String) {
+        settings.audioSource = AppSettings.normalizeAudioSource(source)
+        refreshSourceButton()
     }
 
     private fun toggleCollapsed() {
@@ -341,6 +354,13 @@ class CaptionOverlayView(
         settings.fontSize = AppSettings.normalizeFontSize(settings.fontSize + delta)
         settings.save(context)
         applyStyle()
+    }
+
+    private fun refreshSourceButton() {
+        if (!initialized) return
+        sourceBtn.text = context.getString(
+            if (settings.audioSource == "system") R.string.source_system_short else R.string.source_mic_short
+        )
     }
 
     private fun refreshOutput() {

@@ -89,6 +89,9 @@ data class AppSettings(
         fun normalizeSubtitleMaxLines(value: Int): Int =
             value.coerceIn(SUBTITLE_LINE_OPTIONS.first(), SUBTITLE_LINE_OPTIONS.last())
 
+        fun normalizeAudioSource(value: String): String =
+            if (value.equals("system", ignoreCase = true)) "system" else "mic"
+
         fun normalizeFontSize(value: Int): Int = value.coerceIn(14, 60)
 
         fun normalizeOverlayWidth(value: Int): Int = value.coerceIn(260, 720)
@@ -109,7 +112,7 @@ data class AppSettings(
                     prefs.getString("source_language", "auto") ?: "auto"
                 ),
                 targetLanguage = Languages.normalizeCode(prefs.getString("target_language", "zh-CN") ?: "zh-CN"),
-                audioSource = prefs.getString("audio_source", "mic") ?: "mic",
+                audioSource = normalizeAudioSource(prefs.getString("audio_source", "mic") ?: "mic"),
                 audioChunkMs = normalizeAudioChunkMs(
                     prefs.getInt("audio_chunk_ms", DEFAULT_AUDIO_CHUNK_MS)
                 ),
@@ -147,7 +150,7 @@ data class AppSettings(
             putInt("proxy_port", proxyPort)
             putString("source_language", Languages.normalizeInputCode(sourceLanguage))
             putString("target_language", targetLanguage)
-            putString("audio_source", audioSource)
+            putString("audio_source", normalizeAudioSource(audioSource))
             putInt("audio_chunk_ms", normalizeAudioChunkMs(audioChunkMs))
             putInt("audio_sample_rate", normalizeAudioSampleRate(audioSampleRate))
             putInt("font_size", normalizeFontSize(fontSize))

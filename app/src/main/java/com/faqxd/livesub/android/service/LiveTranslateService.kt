@@ -229,6 +229,30 @@ class LiveTranslateService : Service() {
         updateNotification(running = true)
     }
 
+    private fun switchAudioSource() {
+        val current = AppSettings.load(this)
+        val nextSource = if (current.audioSource == "system") "mic" else "system"
+        current.audioSource = nextSource
+        current.save(this)
+        settings = current
+
+        stopPipeline()
+        overlay?.setAudioSource(nextSource)
+        overlay?.clear()
+
+        if (nextSource == "system") {
+            overlay?.setStatus(getString(R.string.status_need_system_audio_permission))
+            startActivity(
+                MainActivity.requestSystemAudioIntent(this)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            )
+            return
+        }
+
+        overlay?.setStatus(getString(R.string.status_switching_audio_source, getString(R.string.source_mic_short)))
+        startPipeline(0, null)
+    }
+
     private fun togglePipeline() {
         if (running) {
             stopPipeline()
@@ -237,8 +261,8 @@ class LiveTranslateService : Service() {
         if (settings?.audioSource == "system") {
             overlay?.setStatus(getString(R.string.perm_system_audio_rationale))
             startActivity(
-                Intent(this, MainActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                MainActivity.requestSystemAudioIntent(this)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             )
             return
         }
@@ -273,6 +297,9 @@ class LiveTranslateService : Service() {
                             Intent(this@LiveTranslateService, SessionLogActivity::class.java)
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         )
+                    }
+                    override fun onAudioSourceClicked() {
+                        switchAudioSource()
                     }
                     override fun onCloseClicked() {
                         stopServiceAndOverlay()

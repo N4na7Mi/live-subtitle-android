@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity() {
             startServiceWithProjection(result.resultCode, result.data!!)
         } else {
             showHint(getString(R.string.perm_system_audio_rationale))
-            startServiceWithProjection(0, null)
+            pendingStart = false
         }
     }
 
@@ -84,6 +84,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         applySettingsToUi()
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        settings = AppSettings.load(this)
+        serviceRunning = LiveTranslateService.isActive
+        handleIntent(intent)
     }
 
     override fun onResume() {
@@ -126,6 +135,36 @@ class MainActivity : AppCompatActivity() {
         pendingStart = true
         if (!hasOverlayPermission()) {
             showHint(getString(R.string.perm_overlay_rationale))
+            overlayPermissionLauncher.launch(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName"),
+                )
+            )
+            return
+        }
+        if (!hasMicPermission()) {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotifPermission()) {
+            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
+        }
+        continueStartFlow()
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action != ACTION_REQUEST_SYSTEM_AUDIO) return
+        settings = AppSettings.load(this).also {
+            it.audioSource = "system"
+            it.save(this)
+        }
+        serviceRunning = LiveTranslateService.isActive
+        applySettingsToUi()
+        pendingStart = true
+        showHint(getString(R.string.status_need_system_audio_permission))
+        if (!hasOverlayPermission()) {
             overlayPermissionLauncher.launch(
                 Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -193,5 +232,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun showHint(text: String) {
         hintText.text = text
+    }
+
+    companion object {
+        const val ACTION_REQUEST_SYSTEM_AUDIO = "com.faqxd.livesub.android.REQUEST_SYSTEM_AUDIO"
+
+        fun requestSystemAudioIntent(context: android.content.Context): Intent =
+            Intent(context, MainActivity::class.java)
+                .setAction(ACTION_REQUEST_SYSTEM_AUDIO)
     }
 }

@@ -211,6 +211,18 @@
                 android:textSize="13sp" />
 
             <Button
+                android:id="@+id/overlaySourceBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/overlay_btn_secondary"
+                android:minWidth="56dp"
+                android:paddingHorizontal="8dp"
+                android:text="@string/source_mic_short"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp" />
+
+            <Button
                 android:id="@+id/overlayCloseBtn"
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"

@@ -22,6 +22,8 @@
     <string name="overlay_ball_text">字</string>
     <string name="font_smaller">-</string>
     <string name="font_larger">+</string>
+    <string name="source_mic_short">麦克风</string>
+    <string name="source_system_short">系统声</string>
     <string name="resize_handle">↘</string>
     <string name="open_settings">设置</string>
     <string name="status_idle">待机</string>
@@ -30,6 +32,8 @@
     <string name="status_stopped">已停止</string>
     <string name="status_disconnected">连接已断开</string>
     <string name="status_restarting_session">正在重开上下文</string>
+    <string name="status_switching_audio_source">正在切换到%1$s</string>
+    <string name="status_need_system_audio_permission">需要授权系统声音，授权后会自动重开会话。</string>
     <string name="caption_placeholder">等待字幕...</string>
     <string name="lang_badge_prefix">翻译到</string>
 

@@ -198,7 +198,9 @@ class SettingsActivity : AppCompatActivity() {
         if (langIdx in Languages.ALL.indices) {
             settings.targetLanguage = Languages.ALL[langIdx].code
         }
-        settings.audioSource = if (sourceSpinner.selectedItemPosition == 1) "system" else "mic"
+        settings.audioSource = AppSettings.normalizeAudioSource(
+            if (sourceSpinner.selectedItemPosition == 1) "system" else "mic"
+        )
         settings.audioChunkMs = AppSettings.AUDIO_CHUNK_MS_OPTIONS
             .getOrElse(audioChunkSpinner.selectedItemPosition) { AppSettings.DEFAULT_AUDIO_CHUNK_MS }
         settings.audioSampleRate = AppSettings.AUDIO_SAMPLE_RATE_OPTIONS
