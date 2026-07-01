@@ -104,7 +104,16 @@ jobs:
           VERSION_NAME: ${{ steps.version.outputs.name }}
           VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
-          gradle --no-daemon assembleDebug
+          gradle --no-daemon assembleDebug 2>&1 | tee build-debug.log
+          test ${PIPESTATUS[0]} -eq 0
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-debug-log-${{ steps.version.outputs.tag }}
+          path: build-debug.log
+          if-no-files-found: ignore
 
       - name: Collect APKs
         shell: bash
