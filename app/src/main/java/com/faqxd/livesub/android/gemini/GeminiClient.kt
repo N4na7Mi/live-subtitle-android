@@ -177,17 +177,19 @@ class GeminiClient(
         val overrideHost = apiHostOverride.trim()
         if (overrideHost.isNotBlank()) {
             val apiHost = apiBaseHost()
-            builder.dns(Dns { hostname ->
-                if (apiHost.isNotBlank() && hostname.equals(apiHost, ignoreCase = true)) {
-                    try {
-                        InetAddress.getAllByName(overrideHost).toList()
-                    } catch (e: Exception) {
-                        throw UnknownHostException(
-                            "DNS 直连 IP 无法解析：$overrideHost (${e.safeMessage()})"
-                        )
+            builder.dns(object : Dns {
+                override fun lookup(hostname: String): List<InetAddress> {
+                    return if (apiHost.isNotBlank() && hostname.equals(apiHost, ignoreCase = true)) {
+                        try {
+                            InetAddress.getAllByName(overrideHost).toList()
+                        } catch (e: Exception) {
+                            throw UnknownHostException(
+                                "DNS 直连 IP 无法解析：$overrideHost (${e.safeMessage()})"
+                            )
+                        }
+                    } else {
+                        Dns.SYSTEM.lookup(hostname)
                     }
-                } else {
-                    Dns.SYSTEM.lookup(hostname)
                 }
             })
         }
