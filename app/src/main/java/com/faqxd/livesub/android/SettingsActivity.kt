@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.faqxd.livesub.android.data.AppSettings
 import com.faqxd.livesub.android.data.Languages
+import com.faqxd.livesub.android.service.LiveTranslateService
 
 /**
  * Port of `settings_window.py:SettingsDialog`.
@@ -93,6 +94,9 @@ class SettingsActivity : AppCompatActivity() {
         saveBtn.setOnClickListener {
             if (!applyFromUi()) return@setOnClickListener
             settings.save(this)
+            if (LiveTranslateService.isActive) {
+                startService(LiveTranslateService.applySettingsIntent(this))
+            }
             setResult(RESULT_OK)
             finish()
         }

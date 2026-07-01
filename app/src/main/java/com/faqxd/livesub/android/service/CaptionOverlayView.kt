@@ -79,7 +79,7 @@ class CaptionOverlayView(
     private var attached = false
     private var initialized = false
     private var collapsed = false
-    private var locked = false
+    private var locked = settings.overlayLocked
     private var chromeVisible = true
     private var hideChromeRunnable: Runnable? = null
 
@@ -247,6 +247,13 @@ class CaptionOverlayView(
         toggleBtn.text = if (running) context.getString(R.string.stop) else context.getString(R.string.start)
     }
 
+    fun updateSettings(newSettings: AppSettings) {
+        settings.replaceWith(newSettings)
+        locked = settings.overlayLocked
+        applyLockState()
+        applyStyle()
+    }
+
     fun applyStyle() {
         if (!initialized) return
         rootView.alpha = 1f
@@ -282,6 +289,8 @@ class CaptionOverlayView(
 
     private fun toggleLocked() {
         locked = !locked
+        settings.overlayLocked = locked
+        settings.save(context)
         applyLockState()
     }
 

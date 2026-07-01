@@ -27,6 +27,7 @@ import androidx.core.content.edit
  *  - subtitleMaxLines    — Max visual lines in the floating subtitle.
  *  - overlayWidthDp      — Floating subtitle window width.
  *  - overlayHeightDp     — Floating subtitle window height.
+ *  - overlayLocked       — Whether the floating subtitle can be dragged/resized.
  *  - echoTargetLanguage  — Whether to play back the translated audio.
  *  - playbackVolume      — 0..1 playback volume.
  *  - systemPrompt        — Optional custom instructions for the model.
@@ -51,6 +52,7 @@ data class AppSettings(
     var subtitleMaxLines: Int = DEFAULT_SUBTITLE_MAX_LINES,
     var overlayWidthDp: Int = DEFAULT_OVERLAY_WIDTH_DP,
     var overlayHeightDp: Int = DEFAULT_OVERLAY_HEIGHT_DP,
+    var overlayLocked: Boolean = false,
     var echoTargetLanguage: Boolean = false,
     var playbackVolume: Float = 0.8f,
     var systemPrompt: String = "",
@@ -134,6 +136,7 @@ data class AppSettings(
                 overlayHeightDp = normalizeOverlayHeight(
                     prefs.getInt("overlay_height_dp", DEFAULT_OVERLAY_HEIGHT_DP)
                 ),
+                overlayLocked = prefs.getBoolean("overlay_locked", false),
                 echoTargetLanguage = prefs.getBoolean("echo_target", false),
                 playbackVolume = prefs.getFloat("playback_volume", 0.8f),
                 systemPrompt = prefs.getString("system_prompt", "") ?: "",
@@ -163,10 +166,37 @@ data class AppSettings(
             putInt("subtitle_max_lines", normalizeSubtitleMaxLines(subtitleMaxLines))
             putInt("overlay_width_dp", normalizeOverlayWidth(overlayWidthDp))
             putInt("overlay_height_dp", normalizeOverlayHeight(overlayHeightDp))
+            putBoolean("overlay_locked", overlayLocked)
             putBoolean("echo_target", echoTargetLanguage)
             putFloat("playback_volume", playbackVolume)
             putString("system_prompt", systemPrompt)
             putBoolean("show_original", showOriginal)
         }
+    }
+
+    fun replaceWith(other: AppSettings) {
+        apiKey = other.apiKey
+        apiBase = other.apiBase
+        apiHostOverride = other.apiHostOverride
+        proxyEnabled = other.proxyEnabled
+        proxyType = other.proxyType
+        proxyHost = other.proxyHost
+        proxyPort = other.proxyPort
+        sourceLanguage = other.sourceLanguage
+        targetLanguage = other.targetLanguage
+        audioSource = other.audioSource
+        audioChunkMs = other.audioChunkMs
+        audioSampleRate = other.audioSampleRate
+        fontSize = other.fontSize
+        bgOpacity = other.bgOpacity
+        captionOpacity = other.captionOpacity
+        subtitleMaxLines = other.subtitleMaxLines
+        overlayWidthDp = other.overlayWidthDp
+        overlayHeightDp = other.overlayHeightDp
+        overlayLocked = other.overlayLocked
+        echoTargetLanguage = other.echoTargetLanguage
+        playbackVolume = other.playbackVolume
+        systemPrompt = other.systemPrompt
+        showOriginal = other.showOriginal
     }
 }

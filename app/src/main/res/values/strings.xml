@@ -34,6 +34,8 @@
     <string name="status_restarting_session">正在重开上下文</string>
     <string name="status_switching_audio_source">正在切换到%1$s</string>
     <string name="status_need_system_audio_permission">需要授权系统声音，授权后会自动重开会话。</string>
+    <string name="settings_saved_applied">设置已应用</string>
+    <string name="settings_saved_restart_hint">设置已保存；点重开让新会话生效</string>
     <string name="caption_placeholder">等待字幕...</string>
     <string name="lang_badge_prefix">翻译到</string>
 

@@ -79,6 +79,7 @@ class LiveTranslateService : Service() {
                 stopServiceAndOverlay()
             }
             ACTION_TOGGLE -> togglePipeline()
+            ACTION_APPLY_SETTINGS -> applyUpdatedSettings()
         }
         return START_STICKY
     }
@@ -253,6 +254,40 @@ class LiveTranslateService : Service() {
         overlay?.setStatus(getString(R.string.status_switching_audio_source, getString(R.string.source_mic_short)))
         startPipeline(0, null)
     }
+
+    private fun applyUpdatedSettings() {
+        val previous = settings
+        val next = AppSettings.load(this)
+        settings = next
+        overlay?.updateSettings(next)
+        overlay?.setAudioSource(next.audioSource)
+
+        val restartNeeded = running && previous != null && requiresSessionRestart(previous, next)
+        val message = if (restartNeeded) {
+            getString(R.string.settings_saved_restart_hint)
+        } else {
+            getString(R.string.settings_saved_applied)
+        }
+        overlay?.setStatus(message)
+        updateNotification(running = running)
+    }
+
+    private fun requiresSessionRestart(old: AppSettings, new: AppSettings): Boolean =
+        old.apiKey != new.apiKey ||
+            old.apiBase != new.apiBase ||
+            old.apiHostOverride != new.apiHostOverride ||
+            old.proxyEnabled != new.proxyEnabled ||
+            old.proxyType != new.proxyType ||
+            old.proxyHost != new.proxyHost ||
+            old.proxyPort != new.proxyPort ||
+            old.sourceLanguage != new.sourceLanguage ||
+            old.targetLanguage != new.targetLanguage ||
+            old.audioSource != new.audioSource ||
+            old.audioChunkMs != new.audioChunkMs ||
+            old.audioSampleRate != new.audioSampleRate ||
+            old.echoTargetLanguage != new.echoTargetLanguage ||
+            old.playbackVolume != new.playbackVolume ||
+            old.systemPrompt != new.systemPrompt
 
     private fun togglePipeline() {
         if (running) {
@@ -490,6 +525,7 @@ class LiveTranslateService : Service() {
         const val ACTION_START = "com.faqxd.livesub.android.START"
         const val ACTION_STOP = "com.faqxd.livesub.android.STOP"
         const val ACTION_TOGGLE = "com.faqxd.livesub.android.TOGGLE"
+        const val ACTION_APPLY_SETTINGS = "com.faqxd.livesub.android.APPLY_SETTINGS"
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_RESULT_DATA = "result_data"
         @Volatile var isActive: Boolean = false
@@ -503,6 +539,9 @@ class LiveTranslateService : Service() {
 
         fun stopIntent(context: Context): Intent =
             Intent(context, LiveTranslateService::class.java).setAction(ACTION_STOP)
+
+        fun applySettingsIntent(context: Context): Intent =
+            Intent(context, LiveTranslateService::class.java).setAction(ACTION_APPLY_SETTINGS)
     }
 }
 
