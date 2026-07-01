@@ -35,9 +35,11 @@ class MainActivity : AppCompatActivity() {
 
     private var pendingStart = false
     private var serviceRunning = false
-    private val sessionLogListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (SessionLogStore.isLiveTranscriptKey(key)) {
-            runOnUiThread { refreshTranscriptPreview() }
+    private val sessionLogListener = object : SharedPreferences.OnSharedPreferenceChangeListener {
+        override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences, key: String?) {
+            if (SessionLogStore.isLiveTranscriptKey(key)) {
+                runOnUiThread { refreshTranscriptPreview() }
+            }
         }
     }
 
