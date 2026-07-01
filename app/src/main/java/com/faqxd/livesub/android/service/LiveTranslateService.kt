@@ -118,6 +118,7 @@ class LiveTranslateService : Service() {
         }
 
         SessionLogStore.startSession(this)
+        overlay?.clear()
 
         // Gemini client
         val c = createConfiguredClient(s).also { client = it }
@@ -353,10 +354,16 @@ class LiveTranslateService : Service() {
         overlay?.applyStyle()
         try {
             overlay?.attach()
+            refreshOverlayFromSessionLog()
         } catch (e: Exception) {
             Log.e(TAG, "overlay attach failed: ${e.message}")
             notifyStatus(getString(R.string.err_no_overlay_perm))
         }
+    }
+
+    private fun refreshOverlayFromSessionLog() {
+        val output = SessionLogStore.loadLastOutput(this)
+        if (output.isNotBlank()) overlay?.setOutput(output)
     }
 
     // ---------- media projection ----------
@@ -408,7 +415,13 @@ class LiveTranslateService : Service() {
         override fun onOutputTranscript(text: String) {
             if (generation != clientGeneration) return
             SessionLogStore.appendOutput(this@LiveTranslateService, text)
-            scope.launch { overlay?.setOutput(text) }
+            scope.launch {
+                val currentOverlay = overlay
+                if (currentOverlay == null || !currentOverlay.isAttached) {
+                    ensureOverlay(settings ?: AppSettings.load(this@LiveTranslateService).also { settings = it })
+                }
+                refreshOverlayFromSessionLog()
+            }
         }
         override fun onAudioChunk(pcm16: ByteArray) {
             if (generation != clientGeneration) return
