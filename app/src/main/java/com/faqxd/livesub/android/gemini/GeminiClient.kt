@@ -96,11 +96,13 @@ class GeminiClient(
             failBeforeConnect("连接配置无效：${e.safeMessage()}")
             return false
         }
+        val summary = connectionSummary(request)
+        listener.onStatus("正在连接；$summary")
 
         ws = try {
             client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                listener.onStatus("已连接 ${request.url.host}，正在初始化 Gemini")
+                listener.onStatus("已连接；$summary")
                 if (!sendSetup(webSocket)) {
                     running = false
                     ready = false
@@ -125,7 +127,7 @@ class GeminiClient(
                 running = false
                 ready = false
                 ws = null
-                val message = "连接失败（${request.connectionLabel()}）：${t.message ?: "unknown"}"
+                val message = "连接失败（$summary）：${t.message ?: "unknown"}"
                 listener.onStatus(message)
                 listener.onDisconnected(message)
             }
@@ -175,24 +177,31 @@ class GeminiClient(
             .readTimeout(0, TimeUnit.SECONDS)
 
         val overrideHost = apiHostOverride.trim()
-        if (overrideHost.isNotBlank()) {
-            val apiHost = apiBaseHost()
-            builder.dns(object : Dns {
-                override fun lookup(hostname: String): List<InetAddress> {
-                    return if (apiHost.isNotBlank() && hostname.equals(apiHost, ignoreCase = true)) {
-                        try {
-                            InetAddress.getAllByName(overrideHost).toList()
-                        } catch (e: Exception) {
-                            throw UnknownHostException(
-                                "DNS 直连 IP 无法解析：$overrideHost (${e.safeMessage()})"
-                            )
-                        }
-                    } else {
-                        Dns.SYSTEM.lookup(hostname)
+        val apiHost = apiBaseHost()
+        builder.dns(object : Dns {
+            override fun lookup(hostname: String): List<InetAddress> {
+                val shouldInspect = apiHost.isNotBlank() && hostname.equals(apiHost, ignoreCase = true)
+                val addresses = if (shouldInspect && overrideHost.isNotBlank()) {
+                    try {
+                        InetAddress.getAllByName(overrideHost).toList()
+                    } catch (e: Exception) {
+                        throw UnknownHostException(
+                            "DNS 直连 IP 无法解析：$overrideHost (${e.safeMessage()})"
+                        )
                     }
+                } else {
+                    Dns.SYSTEM.lookup(hostname)
                 }
-            })
-        }
+                if (shouldInspect && addresses.any { it.isLoopbackAddress }) {
+                    val resolved = addresses.joinToString(",") { it.hostAddress ?: it.toString() }
+                    val mode = if (overrideHost.isBlank()) "未填写" else overrideHost
+                    throw UnknownHostException(
+                        "DNS 将 $hostname 解析到本机地址 $resolved；DNS直连IP=$mode"
+                    )
+                }
+                return addresses
+            }
+        })
 
         if (proxyEnabled) {
             if (proxyHost.isBlank()) {
@@ -295,6 +304,20 @@ class GeminiClient(
             .joinToString("\n")
     }
 
+    private fun connectionSummary(request: Request): String {
+        val dns = if (apiHostOverride.isBlank()) {
+            "系统DNS"
+        } else {
+            "直连IP $apiHostOverride"
+        }
+        val proxy = if (proxyEnabled) {
+            "$proxyType $proxyHost:$proxyPort"
+        } else {
+            "关闭"
+        }
+        return "目标 ${request.url.host}:${request.url.port}，DNS=$dns，代理=$proxy"
+    }
+
     private fun failBeforeConnect(message: String) {
         running = false
         ready = false
@@ -370,9 +393,6 @@ class GeminiClient(
 }
 
 private fun Throwable.safeMessage(): String = message ?: javaClass.simpleName
-
-private fun Request.connectionLabel(): String =
-    "目标 ${url.host}，${url.scheme}"
 
 private fun isLoopbackHost(host: String): Boolean {
     val h = host.trim().removePrefix("[").removeSuffix("]")
