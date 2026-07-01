@@ -218,6 +218,7 @@ class CaptionOverlayView(
         } else {
             inDraft = t
         }
+        refreshInput()
     }
 
     fun setStatus(status: String?) {
@@ -393,7 +394,8 @@ class CaptionOverlayView(
 
     private fun setTextAnimated(view: TextView, target: String, isOutput: Boolean) {
         val currentTarget = if (isOutput) outputRenderTarget else inputRenderTarget
-        if (currentTarget == target) return
+        if (isOutput) view.visibility = View.VISIBLE
+        if (currentTarget == target && view.text.toString() == target) return
 
         if (isOutput) {
             outputRenderTarget = target
@@ -540,7 +542,11 @@ class CaptionOverlayView(
 
     private fun normalHeightPx(): Int {
         val maxHeight = (context.resources.displayMetrics.heightPixels * 0.55f).toInt()
-        return clampDimension(dp(AppSettings.normalizeOverlayHeight(settings.overlayHeightDp)), dp(96), maxHeight)
+        return clampDimension(
+            dp(AppSettings.normalizeOverlayHeight(settings.overlayHeightDp)),
+            dp(AppSettings.MIN_OVERLAY_HEIGHT_DP),
+            maxHeight
+        )
     }
 
     private fun setWindowSize(widthPx: Int, heightPx: Int, save: Boolean) {
@@ -642,7 +648,11 @@ class CaptionOverlayView(
                     val height = initialHeight + (event.rawY - initialTouchY).toInt()
                     setWindowSize(
                         clampDimension(width, dp(260), context.resources.displayMetrics.widthPixels - dp(24)),
-                        clampDimension(height, dp(96), (context.resources.displayMetrics.heightPixels * 0.55f).toInt()),
+                        clampDimension(
+                            height,
+                            dp(AppSettings.MIN_OVERLAY_HEIGHT_DP),
+                            (context.resources.displayMetrics.heightPixels * 0.55f).toInt()
+                        ),
                         save = false
                     )
                     true

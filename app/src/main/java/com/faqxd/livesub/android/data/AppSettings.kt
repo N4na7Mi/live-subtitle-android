@@ -65,6 +65,7 @@ data class AppSettings(
         const val DEFAULT_SUBTITLE_MAX_LINES = 2
         const val DEFAULT_OVERLAY_WIDTH_DP = 360
         const val DEFAULT_OVERLAY_HEIGHT_DP = 190
+        const val MIN_OVERLAY_HEIGHT_DP = 180
         val AUDIO_CHUNK_MS_OPTIONS = intArrayOf(100, 200, 300, 500)
         val AUDIO_SAMPLE_RATE_OPTIONS = intArrayOf(16000, 24000, 48000)
         val SUBTITLE_LINE_OPTIONS = intArrayOf(1, 2, 3, 4)
@@ -100,7 +101,7 @@ data class AppSettings(
 
         fun normalizeOverlayWidth(value: Int): Int = value.coerceIn(260, 720)
 
-        fun normalizeOverlayHeight(value: Int): Int = value.coerceIn(96, 520)
+        fun normalizeOverlayHeight(value: Int): Int = value.coerceIn(MIN_OVERLAY_HEIGHT_DP, 520)
 
         fun load(context: Context): AppSettings {
             val prefs: SharedPreferences =
