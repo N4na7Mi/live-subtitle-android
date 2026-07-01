@@ -26,6 +26,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var apiKeyEdit: EditText
     private lateinit var showKeyBtn: Button
     private lateinit var apiBaseEdit: EditText
+    private lateinit var apiHostOverrideEdit: EditText
     private lateinit var proxyEnabledCheck: CheckBox
     private lateinit var proxyTypeSpinner: Spinner
     private lateinit var proxyHostEdit: EditText
@@ -58,6 +59,7 @@ class SettingsActivity : AppCompatActivity() {
         apiKeyEdit = findViewById(R.id.apiKeyEdit)
         showKeyBtn = findViewById(R.id.showKeyBtn)
         apiBaseEdit = findViewById(R.id.apiBaseEdit)
+        apiHostOverrideEdit = findViewById(R.id.apiHostOverrideEdit)
         proxyEnabledCheck = findViewById(R.id.proxyEnabledCheck)
         proxyTypeSpinner = findViewById(R.id.proxyTypeSpinner)
         proxyHostEdit = findViewById(R.id.proxyHostEdit)
@@ -101,6 +103,7 @@ class SettingsActivity : AppCompatActivity() {
         apiKeyEdit.setText(settings.apiKey)
         apiBaseEdit.setText(settings.apiBase)
         if (apiBaseEdit.text.isBlank()) apiBaseEdit.hint = AppSettings.DEFAULT_API_BASE
+        apiHostOverrideEdit.setText(settings.apiHostOverride)
         proxyEnabledCheck.isChecked = settings.proxyEnabled
         proxyHostEdit.setText(settings.proxyHost)
         proxyPortEdit.setText(settings.proxyPort.takeIf { it > 0 }?.toString().orEmpty())
@@ -186,6 +189,7 @@ class SettingsActivity : AppCompatActivity() {
 
         settings.apiKey = apiKeyEdit.text.toString().trim()
         settings.apiBase = apiBaseEdit.text.toString().trim().ifBlank { AppSettings.DEFAULT_API_BASE }
+        settings.apiHostOverride = apiHostOverrideEdit.text.toString().trim()
         settings.proxyEnabled = proxyEnabled
         settings.proxyType = if (proxyTypeSpinner.selectedItemPosition == 1) "SOCKS" else "HTTP"
         settings.proxyHost = proxyHost

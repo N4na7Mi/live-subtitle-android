@@ -195,6 +195,7 @@ class LiveTranslateService : Service() {
                 systemPrompt = s.systemPrompt,
                 echoTargetLanguage = s.echoTargetLanguage,
                 apiBase = s.apiBase,
+                apiHostOverride = s.apiHostOverride,
                 proxyEnabled = s.proxyEnabled,
                 proxyType = s.proxyType,
                 proxyHost = s.proxyHost,

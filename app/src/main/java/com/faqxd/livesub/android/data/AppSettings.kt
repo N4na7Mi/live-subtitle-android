@@ -15,6 +15,7 @@ import androidx.core.content.edit
  *  - apiKey              — Google Gemini API key (stored plaintext, like the
  *                          Windows version; users on rooted devices can read it).
  *  - apiBase             — Override for the API base URL (proxy / regional mirror).
+ *  - apiHostOverride     — Optional DNS override IP/host for the API base host.
  *  - sourceLanguage      — Source language hint, or "auto".
  *  - targetLanguage      — ISO-639-1 code, e.g. "zh", "es", "ja".
  *  - audioSource         — "mic" or "system" (loopback via MediaProjection).
@@ -34,6 +35,7 @@ import androidx.core.content.edit
 data class AppSettings(
     var apiKey: String = "",
     var apiBase: String = DEFAULT_API_BASE,
+    var apiHostOverride: String = "",
     var proxyEnabled: Boolean = false,
     var proxyType: String = "HTTP",
     var proxyHost: String = "",
@@ -104,6 +106,7 @@ data class AppSettings(
             return AppSettings(
                 apiKey = prefs.getString("api_key", "") ?: "",
                 apiBase = prefs.getString("api_base", DEFAULT_API_BASE) ?: DEFAULT_API_BASE,
+                apiHostOverride = prefs.getString("api_host_override", "") ?: "",
                 proxyEnabled = prefs.getBoolean("proxy_enabled", false),
                 proxyType = prefs.getString("proxy_type", "HTTP") ?: "HTTP",
                 proxyHost = prefs.getString("proxy_host", "") ?: "",
@@ -144,6 +147,7 @@ data class AppSettings(
         prefs.edit {
             putString("api_key", apiKey)
             putString("api_base", apiBase)
+            putString("api_host_override", apiHostOverride)
             putBoolean("proxy_enabled", proxyEnabled)
             putString("proxy_type", proxyType)
             putString("proxy_host", proxyHost)

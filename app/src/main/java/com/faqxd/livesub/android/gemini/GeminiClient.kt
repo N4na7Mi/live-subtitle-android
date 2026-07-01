@@ -4,6 +4,7 @@ import android.util.Base64
 import android.util.Log
 import com.faqxd.livesub.android.audio.AudioCapture
 import com.faqxd.livesub.android.data.Languages
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -12,8 +13,11 @@ import okhttp3.WebSocketListener
 import okio.ByteString
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.URI
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 class GeminiClient(
@@ -35,6 +39,7 @@ class GeminiClient(
 
     private var apiKey: String = ""
     private var apiBase: String = DEFAULT_API_BASE
+    private var apiHostOverride: String = ""
     private var sourceLang: String = "auto"
     private var targetLang: String = "zh-CN"
     private var inputAudioRate: Int = AudioCapture.DEFAULT_INPUT_RATE
@@ -55,6 +60,7 @@ class GeminiClient(
         systemPrompt: String,
         echoTargetLanguage: Boolean,
         apiBase: String = DEFAULT_API_BASE,
+        apiHostOverride: String = "",
         proxyEnabled: Boolean = false,
         proxyType: String = "HTTP",
         proxyHost: String = "",
@@ -62,6 +68,7 @@ class GeminiClient(
     ) {
         this.apiKey = apiKey.trim()
         this.apiBase = apiBase.ifBlank { DEFAULT_API_BASE }.trim()
+        this.apiHostOverride = apiHostOverride.trim()
         this.sourceLang = Languages.normalizeInputCode(sourceLang)
         this.targetLang = targetLang
         this.inputAudioRate = AudioCapture.normalizeInputRate(inputAudioRate)
@@ -167,6 +174,24 @@ class GeminiClient(
         val builder = OkHttpClient.Builder()
             .readTimeout(0, TimeUnit.SECONDS)
 
+        val overrideHost = apiHostOverride.trim()
+        if (overrideHost.isNotBlank()) {
+            val apiHost = apiBaseHost()
+            builder.dns(Dns { hostname ->
+                if (apiHost.isNotBlank() && hostname.equals(apiHost, ignoreCase = true)) {
+                    try {
+                        InetAddress.getAllByName(overrideHost).toList()
+                    } catch (e: Exception) {
+                        throw UnknownHostException(
+                            "DNS 直连 IP 无法解析：$overrideHost (${e.safeMessage()})"
+                        )
+                    }
+                } else {
+                    Dns.SYSTEM.lookup(hostname)
+                }
+            })
+        }
+
         if (proxyEnabled) {
             if (proxyHost.isBlank()) {
                 clientConfigError = "代理已启用，但代理地址为空"
@@ -212,6 +237,22 @@ class GeminiClient(
         if (Regex("[?&]key=").containsMatchIn(endpoint)) return endpoint
         val separator = if (endpoint.contains("?")) "&" else "?"
         return "$endpoint${separator}key=$apiKey"
+    }
+
+    private fun apiBaseHost(): String {
+        var base = apiBase.ifBlank { DEFAULT_API_BASE }.trim()
+        base = when {
+            base.startsWith("wss://") -> "https://" + base.removePrefix("wss://")
+            base.startsWith("ws://") -> "http://" + base.removePrefix("ws://")
+            base.startsWith("https://") || base.startsWith("http://") -> base
+            base.contains("://") -> return ""
+            else -> "https://$base"
+        }
+        return try {
+            URI(base).host.orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
     }
 
     private fun sendSetup(socket: WebSocket): Boolean {
